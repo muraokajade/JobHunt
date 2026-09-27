@@ -1,7 +1,6 @@
 import { Project } from '../types/project';
 import { statusStyle } from '../constants/projectOptions';
 import { rewardDisplay } from '../utils/rewardDisplay';
-import StatusMeter from './StatusMeter';
 import { resolveMediaForDisplay } from '../utils/mediaFromUrl';
 
 /**
@@ -62,9 +61,13 @@ const DEADLINE_CLASSES: Record<DeadlineState, string> = {
 /**
  * PC(md以上)の列幅。一覧のヘッダー行(ProjectListHeader)と同じ値を使う。
  * ここを直すときは必ず両方そろえる。
+ *
+ * 案件名 : 会社名 = 2 : 1 の可変幅。中間幅でも案件名が先に潰れないよう、会社名を固定上限にしない。
+ * ステータス(点 + 最長4文字)と種別(2文字)はそれぞれ独立した固定幅の列にして、
+ * どちらも省略されず、全行で縦に揃うようにする。
  */
 export const LIST_GRID_CLASS =
-  'md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,11rem)_7rem_5.5rem_6rem_2.5rem] md:items-center md:gap-x-4';
+  'md:grid md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_7rem_5.5rem_5rem_2.5rem_1rem] md:items-center md:gap-x-3';
 
 /** 一覧の列見出し。PCでだけ出す(狭幅は列ではなく2段の折り返しになるため)。 */
 export function ProjectListHeader() {
@@ -78,6 +81,7 @@ export function ProjectListHeader() {
       <span className="text-right">報酬</span>
       <span className="text-right">締切</span>
       <span>ステータス</span>
+      <span>種別</span>
       <span />
     </div>
   );
@@ -104,7 +108,7 @@ export default function ProjectCard({ project: p, selected, onOpen }: ProjectCar
       /*
         狭幅(md未満)は flex-wrap + order で段を組む。
           1段目: 案件名 / ステータス
-          2段目: 会社名・報酬 / 締切・種別(右寄せ。入り切らなければ次の段へ右寄せで落ちる)
+          2段目: 種別・会社名 / 報酬・締切(会社名だけが伸び縮みして省略されるので、2段に収まる)
         PCの列は子要素のDOM順で決まるため、DOM順は変えず max-md: の指定だけで並べ替える。
       */
       className={`block w-full border-b border-slate-100 px-4 py-2.5 text-left last:border-b-0 hover:bg-slate-50 max-md:flex max-md:flex-wrap max-md:items-center max-md:gap-x-2 ${LIST_GRID_CLASS} ${
@@ -122,10 +126,10 @@ export default function ProjectCard({ project: p, selected, onOpen }: ProjectCar
       </span>
 
       {/*
-        会社名・報酬・締切・ステータスの4項目。
+        会社名・報酬・締切・ステータス・種別の5項目。
 
-        contents でこの入れ物自体を消し、4つを行の直接の子として扱う。
-        PC(md以上)ではそのまま一覧の列(col2〜col5)へ流れ込み、
+        contents でこの入れ物自体を消し、5つを行の直接の子として扱う。
+        PC(md以上)ではそのまま一覧の列(col2〜col6)へ流れ込み、
         狭幅では上の order で段へ振り分けられる。
         こうすると値をDOMへ二重に置かずに、PCと狭幅で並べ方だけを変えられる。
       */}
@@ -133,11 +137,12 @@ export default function ProjectCard({ project: p, selected, onOpen }: ProjectCar
         {/* 1段目と2段目の区切り。狭幅だけで使い、高さは段の間隔を兼ねる。 */}
         <span className="max-md:order-3 max-md:h-1 max-md:basis-full md:hidden" />
 
-        <span className="min-w-0 truncate text-slate-500 max-md:order-4 max-md:max-w-[55%]">{company}</span>
+        {/* 狭幅では幅0から伸びる(basis-0 grow)ので、長い会社名でも段を増やさずに省略される。 */}
+        <span className="min-w-0 truncate text-slate-500 max-md:order-5 max-md:basis-0 max-md:grow">{company}</span>
 
-        <span className="text-slate-600 tabular-nums max-md:order-5 max-md:truncate md:truncate md:text-right">{reward}</span>
+        <span className="text-slate-600 tabular-nums max-md:order-6 max-md:max-w-[35%] max-md:truncate md:truncate md:text-right">{reward}</span>
 
-        <span className="whitespace-nowrap tabular-nums max-md:order-6 max-md:ml-auto md:text-right">
+        <span className="whitespace-nowrap tabular-nums max-md:order-7 md:text-right">
           {deadline && (
             <>
               {/* PCは列見出しが「締切」を示すので、ラベルは狭幅だけに出す。 */}
@@ -148,21 +153,20 @@ export default function ProjectCard({ project: p, selected, onOpen }: ProjectCar
         </span>
 
         {/*
-          PCはステータスと種別を同じ列に並べる。
-          狭幅は入れ物を消し、ステータスは案件名の右、種別は締切の後ろへ離して置く
-          (隣り合うとステータスの一部に見えるため)。
-          ステータスは「段階メーター + 色付き文字」で1つのまとまりにする。
-          進み具合はメーターの塗られたマスの数で示し、色(4グループ)は補助にとどめる。
-          背景付きの札にはしない(行ごとに塗り面が並ぶと、案件名より目立ってしまうため)。
-          PCの列幅は変えないので、入り切らないときはメーターを残してステータス名の方を省略する。
+          ステータスは「小さな色付きの点 + 状態名」。色は進捗の意味(4グループ)を補うだけで、
+          状態は常に文字で読める。背景付きの札にはしない(行ごとに塗り面が並ぶと案件名より目立つため)。
+          狭幅では案件名の右(1段目)に置く。
         */}
-        <span className="max-md:contents md:truncate">
-          <span className={`inline-flex max-w-full items-center gap-1.5 font-medium max-md:order-2 max-md:shrink-0 ${status.text}`}>
-            <StatusMeter type={p.type} status={p.status} />
-            <span className="min-w-0 truncate">{p.status}</span>
-          </span>
-          <span className="ml-1.5 text-slate-400 max-md:order-7 max-md:ml-0">{TYPE_LABELS[p.type]}</span>
+        <span className={`flex min-w-0 items-center gap-1.5 font-medium max-md:order-2 max-md:shrink-0 ${status.text}`}>
+          <span aria-hidden="true" className={`h-2 w-2 shrink-0 rounded-full ${status.dot}`} />
+          <span className="min-w-0 truncate">{p.status}</span>
         </span>
+
+        {/*
+          種別。PCは独立した列、狭幅は2段目の先頭。
+          ステータスの隣に並べると状態の一部に見えるので、どちらの幅でも離して置く。
+        */}
+        <span className="whitespace-nowrap text-slate-400 max-md:order-4">{TYPE_LABELS[p.type]}</span>
       </span>
 
       {/* 開く方向の記号。行そのものが押せるので、これは印であって独立したボタンではない。 */}

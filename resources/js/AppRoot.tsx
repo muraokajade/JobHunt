@@ -420,11 +420,13 @@ function AppRoot() {
         /*
           PCで詳細パネルを開いている間は、本文の右側にパネルぶんの余白を作る。
           一覧が隠れないので、詳細を読みながら次の案件へ乗り換えられる。
+          md幅(768〜1023px)では余白を作らず、パネルを一覧の上に重ねる。
+          ここで27rem空けると本文が約310pxになり、一覧の固定列(約450px)が収まらず右側が切れるため。
         */
         <main
           className={`mx-auto max-w-6xl px-4 py-4 transition-[padding] md:px-6 ${
             isOnboarding ? '' : 'space-y-3'
-          } ${selectedProject !== null ? 'md:pr-[27rem] lg:pr-[31rem]' : ''}`}
+          } ${selectedProject !== null ? 'lg:pr-[31rem]' : ''}`}
         >
           {isOnboarding ? (
             /*
@@ -529,14 +531,14 @@ function AppRoot() {
                 value={searchInput}
                 onChange={e => setSearchInput(e.target.value)}
                 /* 狭幅は16px。iOS Safariは16px未満の入力欄でフォーカス時に自動拡大するため。 */
-                className="min-h-11 w-full rounded-md border border-slate-300 bg-white pl-3 pr-10 text-base focus:ring-2 focus:ring-slate-400 focus:outline-none sm:min-h-9 sm:text-sm"
+                className="min-h-11 w-full rounded-md border border-slate-300 bg-white pl-3 pr-11 text-base focus:ring-2 focus:ring-slate-400 focus:outline-none sm:min-h-9 sm:pr-10 sm:text-sm"
               />
               {searchInput && (
                 <button
                   type="button"
                   onClick={clearSearch}
                   aria-label="検索をクリア"
-                  className="absolute top-1/2 right-1 flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded text-slate-400 hover:text-slate-600"
+                  className="absolute top-1/2 right-0 flex h-11 w-11 -translate-y-1/2 sm:right-1 sm:h-9 sm:w-9 items-center justify-center rounded text-slate-400 hover:text-slate-600"
                 >
                   ×
                 </button>

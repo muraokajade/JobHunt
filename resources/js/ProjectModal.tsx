@@ -371,7 +371,8 @@ export default function ProjectModal({
               {fieldError('memo') && <p className="text-red-600 text-xs mt-1">{fieldError('memo')}</p>}
             </div>
             <div className="md:col-span-2">
-              <label className="flex items-center gap-2 text-sm text-slate-700">
+              {/* 狭幅では行ぜんぶ(高さ44px)を押せる範囲にする。チェックボックス単体は小さいため。 */}
+              <label className="flex min-h-11 items-center gap-2 text-sm text-slate-700 sm:min-h-0">
                 <input type="checkbox" name="is_favorite" checked={form.is_favorite} onChange={handleChange}
                   className="rounded border-slate-300" />
                 お気に入り

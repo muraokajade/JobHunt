@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { render, screen, fireEvent, within } from '@testing-library/react';
+import { render, screen, fireEvent } from '@testing-library/react';
 import ProjectCard, { ProjectListHeader, deadlineState } from './ProjectCard';
 import { Project } from '../types/project';
 
@@ -188,10 +188,21 @@ describe('ProjectCard 一覧の読みやすさ', () => {
     expect(row().className).toContain('md:grid-cols-');
   });
 
-  it('PCの列幅(ステータス列6rem・案件名列の可変幅)は変えていない', () => {
+  it('PCは案件名:会社名を2:1で分け、ステータスと種別はそれぞれ独立した固定幅の列にする', () => {
     render(<ProjectCard project={makeProject()} onOpen={() => {}} />);
 
-    expect(row()).toHaveClass('md:grid-cols-[minmax(0,1fr)_minmax(0,11rem)_7rem_5.5rem_6rem_2.5rem]');
+    expect(row()).toHaveClass('md:grid-cols-[minmax(0,2fr)_minmax(0,1fr)_7rem_5.5rem_5rem_2.5rem_1rem]');
+  });
+
+  it('PCではステータスと種別が別々の列(行の直接の格子要素)になる', () => {
+    render(<ProjectCard project={makeProject({ status: '最終面接', type: 'career' })} onOpen={() => {}} />);
+
+    const status = screen.getByText('最終面接').parentElement!;
+    const type = screen.getByText('転職');
+    expect(status).not.toContainElement(type);
+    // 入れ物は display:contents なので、どちらも行の格子へ直接並ぶ。
+    expect(status.parentElement).toHaveClass('contents');
+    expect(type.parentElement).toHaveClass('contents');
   });
 
   it('列見出しは行と同じグリッド定義を使う', () => {
@@ -199,7 +210,7 @@ describe('ProjectCard 一覧の読みやすさ', () => {
 
     const header = container.firstElementChild!;
     expect(header.className).toContain('md:grid-cols-');
-    for (const label of ['案件名', '会社名', '報酬', '締切', 'ステータス']) {
+    for (const label of ['案件名', '会社名', '報酬', '締切', 'ステータス', '種別']) {
       expect(header.textContent).toContain(label);
     }
   });
@@ -236,15 +247,15 @@ describe('ProjectCard スマホの情報階層', () => {
   /** order指定を持つ、行の中の要素(値の入れ物)。 */
   const cell = (text: string) => screen.getByText(text).closest('[class*="max-md:order-"]')!;
 
-  it('1段目は案件名とステータス、2段目は会社名・報酬、その後ろに締切・種別の順で並ぶ', () => {
+  it('1段目は案件名とステータス、2段目は種別・会社名・報酬・締切の順で並ぶ', () => {
     renderSample();
 
     expect(cell('フロント改修')).toHaveClass('max-md:order-1');
     expect(cell('応募済み')).toHaveClass('max-md:order-2');
-    expect(cell('株式会社サンプル')).toHaveClass('max-md:order-4');
-    expect(cell('80,000円')).toHaveClass('max-md:order-5');
-    expect(cell('2099-12-31')).toHaveClass('max-md:order-6');
-    expect(cell('副業')).toHaveClass('max-md:order-7');
+    expect(cell('副業')).toHaveClass('max-md:order-4');
+    expect(cell('株式会社サンプル')).toHaveClass('max-md:order-5');
+    expect(cell('80,000円')).toHaveClass('max-md:order-6');
+    expect(cell('2099-12-31')).toHaveClass('max-md:order-7');
   });
 
   it('1段目と2段目の間で必ず折り返し、区切りはPCでは出さない', () => {
@@ -264,11 +275,18 @@ describe('ProjectCard スマホの情報階層', () => {
     expect(cell('応募済み')).toHaveClass('max-md:shrink-0');
   });
 
-  it('締切・種別は右へ寄せ、種別はステータスの隣に置かない', () => {
+  it('2段目は会社名だけが伸び縮みして省略され、長い値でも3段目へ折り返さない', () => {
     renderSample();
 
-    expect(cell('2099-12-31')).toHaveClass('max-md:ml-auto');
-    expect(cell('副業')).toHaveClass('max-md:ml-0');
+    expect(cell('株式会社サンプル')).toHaveClass('max-md:basis-0', 'max-md:grow', 'min-w-0', 'truncate');
+    expect(cell('80,000円')).toHaveClass('max-md:max-w-[35%]', 'max-md:truncate');
+    expect(cell('2099-12-31')).toHaveClass('whitespace-nowrap');
+  });
+
+  it('種別はステータスの隣に置かない(状態の一部に見えないようにする)', () => {
+    renderSample();
+
+    expect(cell('応募済み')).not.toContainElement(screen.getByText('副業'));
   });
 
   it('PCの列はDOM順で決まるため、案件名・会社・報酬・締切・ステータス・種別の順を保つ', () => {
@@ -284,90 +302,63 @@ describe('ProjectCard スマホの情報階層', () => {
 });
 
 describe('ProjectCard ステータス表示', () => {
-  /** 一覧のステータスは「段階メーター + 色付き文字」で1つのまとまり。 */
-  const meter = () => screen.getByRole('img', { name: /^進み具合/ });
-  const segments = () => Array.from(meter().children);
-  const filledCount = () => meter().querySelectorAll('[data-filled="true"]').length;
+  /** 一覧のステータスは「小さな色付きの点1個 + 状態名」。 */
+  const statusDot = (container: HTMLElement) => container.querySelector('span[aria-hidden="true"]');
   const renderStatus = (status: string, type: Project['type'] = 'career') =>
     render(<ProjectCard project={makeProject({ status, type })} onOpen={() => {}} />);
 
-  it('ステータス名の直前に、常に6マスの段階メーターを置く', () => {
-    renderStatus('書類選考');
+  it('ステータス名の直前に小さな点を1個だけ置き、段階メーターは出さない', () => {
+    const { container } = renderStatus('書類選考');
 
     const status = screen.getByText('書類選考').parentElement!;
-    expect(status).toContainElement(meter());
-    expect(status.firstElementChild).toBe(meter());
-    expect(segments()).toHaveLength(6);
+    expect(status.firstElementChild).toBe(statusDot(container));
+    expect(statusDot(container)).toHaveClass('h-2', 'w-2', 'rounded-full');
+    expect(status.querySelectorAll('span[aria-hidden="true"]')).toHaveLength(1);
+    expect(screen.queryByRole('img', { name: /^進み具合/ })).not.toBeInTheDocument();
   });
 
-  it('到達した段階の数だけマスを塗り、aria-labelでも同じ数を読めるようにする', () => {
-    const cases: [string, Project['type'], number][] = [
-      ['気になる', 'career', 0],
-      ['書類選考', 'career', 3],
-      ['内定', 'career', 6],
-      ['契約', 'side_job', 4],
-      ['完了', 'side_job', 6],
+  it('色は進捗の意味(未着手・選考中/進行中・成功・見送り)を補うだけにする', () => {
+    const cases: [string, string, string][] = [
+      ['気になる', 'bg-slate-400', 'text-slate-600'],
+      ['書類選考', 'bg-blue-500', 'text-blue-700'],
+      ['最終面接', 'bg-blue-500', 'text-blue-700'],
+      ['契約', 'bg-blue-500', 'text-blue-700'],
+      ['完了', 'bg-green-500', 'text-green-700'],
+      ['見送り', 'bg-slate-300', 'text-slate-400'],
     ];
-    for (const [status, type, step] of cases) {
-      const { unmount } = renderStatus(status, type);
-      expect(filledCount()).toBe(step);
-      expect(meter()).toHaveAccessibleName(`進み具合 ${step}/6`);
+    for (const [status, dot, text] of cases) {
+      const { container, unmount } = renderStatus(status);
+      expect(statusDot(container)).toHaveClass(dot);
+      expect(screen.getByText(status).parentElement).toHaveClass(text);
       unmount();
     }
   });
 
-  it('塗られたマスは進捗グループの色、未到達のマスは薄いslateにする', () => {
-    renderStatus('書類選考');
-
-    const [filled, , , empty] = segments();
-    expect(filled).toHaveClass('bg-blue-500');
-    expect(empty).toHaveClass('bg-slate-200');
-  });
-
-  it('見送りは段階として数えず、マスの代わりに終了を示す線を出す', () => {
-    renderStatus('見送り');
-
-    expect(meter()).toHaveAccessibleName('進み具合 終了');
-    expect(meter().querySelectorAll('[data-filled]')).toHaveLength(0);
-    expect(meter().querySelector('.border-dashed')).not.toBeNull();
-    expect(screen.getByText('見送り').parentElement).toHaveClass('text-slate-400');
-  });
-
-  it('ステータス名は進捗グループの色で出し、塗りバッジにしない', () => {
+  it('ステータスは塗りバッジにしない', () => {
     renderStatus('内定');
 
-    const status = screen.getByText('内定').parentElement!;
-    expect(status).toHaveClass('text-green-700');
-    expect(status.className).not.toContain('bg-');
+    expect(screen.getByText('内定').parentElement!.className).not.toContain('bg-');
   });
 
-  it('未知のステータスでも色で意味を作らず、0段階・中立の見た目で出す', () => {
-    renderStatus('未知の状態');
+  it('未知のステータスでも色で意味を作らず、中立の見た目で出す', () => {
+    const { container } = renderStatus('未知の状態');
 
-    expect(filledCount()).toBe(0);
+    expect(statusDot(container)).toHaveClass('bg-slate-400');
     expect(screen.getByText('未知の状態').parentElement).toHaveClass('text-slate-600');
-  });
-
-  it('列幅が足りないときは、メーターを残してステータス名の方を省略する', () => {
-    renderStatus('書類選考');
-
-    expect(meter()).toHaveClass('shrink-0');
-    expect(screen.getByText('書類選考')).toHaveClass('min-w-0', 'truncate');
   });
 
   it('案件名の手前には状態の印を置かない', () => {
     render(<ProjectCard project={makeProject({ name: 'フロント改修' })} onOpen={() => {}} />);
 
-    const nameCell = screen.getByText('フロント改修').parentElement!;
-    expect(within(nameCell).queryByRole('img', { name: /^進み具合/ })).toBeNull();
+    expect(screen.getByText('フロント改修').parentElement!.querySelector('span[aria-hidden="true"]')).toBeNull();
   });
 
-  it('メーターの上を押しても、行と同じく詳細が開く', () => {
+  it('ステータスの上を押しても、行と同じく詳細が開く', () => {
     const onOpen = vi.fn();
     const project = makeProject({ status: '面接', type: 'career' });
     render(<ProjectCard project={project} onOpen={onOpen} />);
 
-    fireEvent.click(meter());
+    fireEvent.click(screen.getByText('面接'));
 
     expect(onOpen).toHaveBeenCalledWith(project);
   });

@@ -85,7 +85,8 @@ export default function TrashView({ onClose }: TrashViewProps) {
   return (
     <main
       className={`mx-auto max-w-6xl space-y-3 px-4 py-4 transition-[padding] md:px-6 ${
-        selectedProject !== null ? 'md:pr-[27rem] lg:pr-[31rem]' : ''
+        // md幅では余白を作らずパネルを重ねる(一覧の固定列が収まらず切れるため。AppRootと同じ)。
+        selectedProject !== null ? 'lg:pr-[31rem]' : ''
       }`}
     >
       <div className="flex items-center justify-between gap-3">
