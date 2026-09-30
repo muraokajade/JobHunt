@@ -512,6 +512,75 @@ describe('ProjectModal', () => {
     expect(container).toBeTruthy();
   });
 
+  describe('ステータスの初期値', () => {
+    const savedProject = (status: string) => ({
+      id: 1, type: 'career' as const, name: '案件', project_url: null, client_name: null,
+      media: null, category: null, description: null, applied_date: null, deadline: null,
+      status, reward: null, reward_text: null,
+      working_hours: null, applicant_count: null, recruitment_count: null, application_text: null,
+      next_action: null, next_action_date: null, memo: null, priority: null, is_favorite: false,
+      job_type: null, location: null, remote_type: null, employment_type: null,
+      contract_type: null, delivery_date: null, fetched_at: null, deleted_at: null,
+      created_at: '2026-09-01T00:00:00Z', updated_at: '2026-09-01T00:00:00Z',
+    });
+    const statusSelect = () => screen.getByLabelText('ステータス') as HTMLSelectElement;
+
+    it('新規登録は「応募済み」から始まり、種別を切り替えても保たれる', () => {
+      render(<ProjectModal open mode="create" project={null} onClose={() => {}} onSubmit={() => {}} />);
+
+      expect(statusSelect().value).toBe('応募済み');
+      fireEvent.change(screen.getByLabelText('種別'), { target: { value: 'career' } });
+      expect(statusSelect().value).toBe('応募済み');
+      fireEvent.change(screen.getByLabelText('種別'), { target: { value: 'side_job' } });
+      expect(statusSelect().value).toBe('応募済み');
+    });
+
+    it('登録時に別のステータスを選べば、その値で送信する', () => {
+      const onSubmit = vi.fn();
+      const { container } = render(
+        <ProjectModal open mode="create" project={null} onClose={() => {}} onSubmit={onSubmit} />
+      );
+
+      fireEvent.change(container.querySelector('input[name="name"]')!, { target: { value: 'まだ応募していない案件' } });
+      fireEvent.change(screen.getByLabelText('種別'), { target: { value: 'career' } });
+      fireEvent.change(statusSelect(), { target: { value: '気になる' } });
+      fireEvent.click(screen.getByRole('button', { name: '登録' }));
+
+      expect(onSubmit.mock.calls[0][0].status).toBe('気になる');
+    });
+
+    it('編集は保存済みのステータスのまま開く(応募済みで上書きしない)', () => {
+      render(<ProjectModal open mode="edit" project={savedProject('気になる')} onClose={() => {}} onSubmit={() => {}} />);
+
+      expect(statusSelect().value).toBe('気になる');
+    });
+  });
+
+  describe('活動メモ', () => {
+    it('「活動メモ」として、後から届いた情報を記録できる欄だと分かるようにする', () => {
+      render(<ProjectModal open mode="create" project={null} onClose={() => {}} onSubmit={() => {}} />);
+
+      const memo = screen.getByLabelText('活動メモ');
+      expect(memo.tagName).toBe('TEXTAREA');
+      expect(memo).toHaveAccessibleDescription('ここに後から届いた情報や選考メモを記録できます。');
+      expect(memo.getAttribute('placeholder')).toContain('面接日程の連絡あり');
+    });
+
+    it('メモを書くために開いたときは、メモ欄へ直接フォーカスする', () => {
+      render(
+        <ProjectModal open mode="create" project={null} initialFocus="memo" onClose={() => {}} onSubmit={() => {}} />
+      );
+
+      expect(screen.getByLabelText('活動メモ')).toHaveFocus();
+    });
+
+    it('通常の編集ではメモ欄へ勝手にフォーカスしない', () => {
+      render(<ProjectModal open mode="create" project={null} onClose={() => {}} onSubmit={() => {}} />);
+
+      expect(screen.getByLabelText('活動メモ')).not.toHaveFocus();
+    });
+  });
+
   // jsdomはCSSを適用しないため、レイアウトは付与しているクラスと構造で確認する。
   describe('スマホ向けレイアウト', () => {
     const renderCreate = () =>

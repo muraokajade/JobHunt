@@ -27,7 +27,10 @@ export const emptyFormData = (type: ProjectType | '' = ''): ProjectFormData => (
   description: '',
   applied_date: '',
   deadline: '',
-  status: '気になる',
+  // 新規登録の既定は「応募済み」(応募した求人を管理する使い方が中心のため)。
+  // 転職・副業のどちらにもある値なので、種別を切り替えても保たれる。
+  // URL取込(previewToFormData)も手入力もここを通る。編集は保存済みの値を使う(projectToFormData)。
+  status: '応募済み',
   reward: '',
   reward_text: '',
   working_hours: '',

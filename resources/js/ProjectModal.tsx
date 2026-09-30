@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { DuplicateProjectCandidate, Project, ProjectFormData, ProjectType, SIDE_JOB_ALLOWED_LABELS, SideJobAllowed } from './types/project';
 import { MEDIA_OPTIONS, CATEGORY_OPTIONS, statusOptionsForType } from './constants/projectOptions';
 import { emptyFormData, projectToFormData } from './utils/toFormData';
@@ -20,6 +20,8 @@ interface ProjectModalProps {
   notice?: ProjectModalNotice | null;
   isSubmitting?: boolean;
   errors?: Record<string, string[]>;
+  /** 開いた直後に入力できる状態にする項目。詳細パネルの「メモ」から編集を開いたときに使う。 */
+  initialFocus?: 'memo';
   onClose: () => void;
   onSubmit: (data: ProjectFormData) => void;
 }
@@ -46,11 +48,13 @@ export default function ProjectModal({
   notice,
   isSubmitting,
   errors,
+  initialFocus,
   onClose,
   onSubmit,
 }: ProjectModalProps) {
   const [form, setForm] = useState<ProjectFormData>(emptyFormData());
   const [error, setError] = useState('');
+  const memoRef = useRef<HTMLTextAreaElement>(null);
 
   const fieldError = (name: string) => errors?.[name]?.[0];
 
@@ -65,6 +69,14 @@ export default function ProjectModal({
     }
     setError('');
   }, [mode, project, initialData, open]);
+
+  // メモを書くために開いたときは、長いフォームを下までたどらせず、メモ欄へ直接移る。
+  useEffect(() => {
+    if (!open || initialFocus !== 'memo') return;
+    const memo = memoRef.current;
+    memo?.focus();
+    memo?.scrollIntoView?.({ block: 'center' });
+  }, [open, initialFocus]);
 
   if (!open) return null;
 
@@ -365,8 +377,17 @@ export default function ProjectModal({
               {fieldError('application_text') && <p className="text-red-600 text-xs mt-1">{fieldError('application_text')}</p>}
             </div>
             <div className="md:col-span-2">
-              <label className="block text-sm font-medium text-slate-700 mb-1">メモ</label>
-              <textarea name="memo" value={form.memo} onChange={handleChange} rows={3}
+              {/*
+                登録後に企業から届いた情報や、自分の判断を書き足していく欄(保存先はmemo)。
+                空のときに何を書く場所か分かるよう、用途と例を添える。
+              */}
+              <label htmlFor="memo" className="block text-sm font-medium text-slate-700 mb-1">活動メモ</label>
+              <p id="memo-help" className="mb-1.5 text-xs text-slate-500">
+                ここに後から届いた情報や選考メモを記録できます。
+              </p>
+              <textarea id="memo" ref={memoRef} name="memo" value={form.memo} onChange={handleChange} rows={4}
+                aria-describedby="memo-help"
+                placeholder={'例: 9/30 面接日程の連絡あり\n10/2 19:00 一次面接'}
                 className={FIELD_CLASS} />
               {fieldError('memo') && <p className="text-red-600 text-xs mt-1">{fieldError('memo')}</p>}
             </div>

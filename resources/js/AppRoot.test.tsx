@@ -251,6 +251,162 @@ describe('AppRoot', () => {
     expect(screen.getByText(/対応中 1 ・ 終了 0/)).toBeInTheDocument();
   });
 
+  /** 一覧の行(案件名)を、画面に並んでいる順で取り出す。 */
+  const rowNames = () =>
+    screen
+      .getAllByRole('button', { name: /の詳細を開く$/ })
+      .map(b => (b.getAttribute('aria-label') ?? '').replace(/ の詳細を開く$/, ''));
+
+  it('一覧は選考の進み具合が大きい順、同じなら更新の新しい順に並ぶ(終了系は下)', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      // APIは登録の新しい順で返す。画面側で並べ替えることを確かめる。
+      return Promise.resolve(jsonResponse(200, {
+        data: [
+          makeProject({ id: 6, name: '見送りA', type: 'career', status: '見送り', updated_at: '2026-09-30T09:00:00.000000Z' }),
+          makeProject({ id: 5, name: '気になるA', type: 'career', status: '気になる', updated_at: '2026-09-29T00:00:00.000000Z' }),
+          makeProject({ id: 4, name: '面接・古い', type: 'career', status: '面接', updated_at: '2026-09-10T00:00:00.000000Z' }),
+          makeProject({ id: 3, name: '応募済みA', type: 'career', status: '応募済み', updated_at: '2026-09-28T00:00:00.000000Z' }),
+          makeProject({ id: 2, name: '面接・新しい', type: 'career', status: '面接', updated_at: '2026-09-25T00:00:00.000000Z' }),
+          makeProject({ id: 1, name: '内定A', type: 'career', status: '内定', updated_at: '2026-09-01T00:00:00.000000Z' }),
+        ],
+      }));
+    });
+
+    render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('内定A')).toBeInTheDocument());
+
+    expect(rowNames()).toEqual(['内定A', '面接・新しい', '面接・古い', '応募済みA', '気になるA', '見送りA']);
+  });
+
+  it('転職/副業で絞り込んでも、その結果の中で同じ並び順を保つ', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      if (url.includes('type=side_job')) {
+        return Promise.resolve(jsonResponse(200, {
+          data: [
+            makeProject({ id: 13, name: '副業・完了', type: 'side_job', status: '完了' }),
+            makeProject({ id: 12, name: '副業・応募済み', type: 'side_job', status: '応募済み' }),
+            makeProject({ id: 11, name: '副業・作業中', type: 'side_job', status: '作業中' }),
+          ],
+        }));
+      }
+      return Promise.resolve(jsonResponse(200, {
+        data: [
+          makeProject({ id: 2, name: '転職・気になる', type: 'career', status: '気になる' }),
+          makeProject({ id: 1, name: '転職・最終面接', type: 'career', status: '最終面接' }),
+        ],
+      }));
+    });
+
+    render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('転職・最終面接')).toBeInTheDocument());
+    expect(rowNames()).toEqual(['転職・最終面接', '転職・気になる']);
+
+    fireEvent.click(screen.getByRole('button', { name: '副業' }));
+
+    await waitFor(() => expect(screen.getByText('副業・作業中')).toBeInTheDocument());
+    expect(rowNames()).toEqual(['副業・作業中', '副業・応募済み', '副業・完了']);
+  });
+
+  it('手入力の新規登録は「応募済み」で送信される', async () => {
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      if (options?.method === 'POST') return Promise.resolve(jsonResponse(201, { data: makeProject({ id: 9 }) }));
+      return Promise.resolve(jsonResponse(200, { data: [makeProject({ name: '既存案件' })] }));
+    });
+
+    const { container } = render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('既存案件')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: '手入力' }));
+    expect((screen.getByLabelText('ステータス') as HTMLSelectElement).value).toBe('応募済み');
+    fireEvent.change(container.querySelector('input[name="name"]')!, { target: { value: '手入力の案件' } });
+    fireEvent.change(screen.getByLabelText('種別'), { target: { value: 'career' } });
+    fireEvent.click(screen.getByRole('button', { name: '登録' }));
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([u, init]) => String(u) === '/api/projects' && (init as RequestInit)?.method === 'POST');
+      expect(post).toBeDefined();
+      expect(JSON.parse(String((post![1] as RequestInit).body)).status).toBe('応募済み');
+    });
+  });
+
+  it('URL取込の新規登録も「応募済み」で送信される', async () => {
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      if (url.includes('/api/import/preview')) {
+        return Promise.resolve(jsonResponse(200, {
+          data: {
+            project_url: 'https://example.com/job/1', type: 'career', name: '取込した求人', description: null,
+            client_name: null, media: null, category: null, reward: null, reward_text: null, working_hours: null,
+            applicant_count: null, recruitment_count: null, deadline: null, job_type: null, location: null,
+            remote_type: null, employment_type: null, contract_type: null, delivery_date: null,
+            fetched_at: '2026-09-30T00:00:00+09:00', fetch_status: 'success', warnings: [],
+          },
+        }));
+      }
+      if (options?.method === 'POST') return Promise.resolve(jsonResponse(201, { data: makeProject({ id: 9 }) }));
+      return Promise.resolve(jsonResponse(200, { data: [makeProject({ name: '既存案件' })] }));
+    });
+
+    render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('既存案件')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: '求人URLを登録' }));
+    fireEvent.change(screen.getByPlaceholderText('https://...'), { target: { value: 'https://example.com/job/1' } });
+    fireEvent.change(screen.getByLabelText('種別'), { target: { value: 'career' } });
+    fireEvent.click(screen.getByRole('button', { name: '求人情報を読み込む' }));
+
+    await waitFor(() => expect(screen.getByText('案件を登録')).toBeInTheDocument());
+    // 取込結果がフォームへ入るのを待ってから登録する(取込内容を引き継いだ状態で送信されることを見る)。
+    await waitFor(() => expect(screen.getByDisplayValue('取込した求人')).toBeInTheDocument());
+    expect((screen.getByLabelText('ステータス') as HTMLSelectElement).value).toBe('応募済み');
+    fireEvent.click(screen.getByRole('button', { name: '登録' }));
+
+    await waitFor(() => {
+      const post = fetchMock.mock.calls.find(([u, init]) => String(u) === '/api/projects' && (init as RequestInit)?.method === 'POST');
+      expect(post).toBeDefined();
+      const body = JSON.parse(String((post![1] as RequestInit).body));
+      expect(body.status).toBe('応募済み');
+      expect(body.project_url).toBe('https://example.com/job/1');
+    });
+  });
+
+  it('詳細パネルの「メモを書く」から活動メモを保存でき、保存後はパネルにそのまま表示される(ステータスは保存済みのまま)', async () => {
+    let memo: string | null = null;
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      if (options?.method === 'PATCH') {
+        memo = JSON.parse(String(options.body)).memo;
+        return Promise.resolve(jsonResponse(200, { data: makeProject({ id: 5, name: 'メモ案件', type: 'career', status: '書類選考', memo }) }));
+      }
+      return Promise.resolve(jsonResponse(200, { data: [makeProject({ id: 5, name: 'メモ案件', type: 'career', status: '書類選考', memo })] }));
+    });
+
+    render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('メモ案件')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: 'メモ案件 の詳細を開く' }));
+    fireEvent.click(screen.getByRole('button', { name: 'メモを書く' }));
+
+    const memoField = screen.getByLabelText('活動メモ');
+    expect(memoField).toHaveFocus();
+    fireEvent.change(memoField, { target: { value: '9/30 面接日程の連絡あり' } });
+    fireEvent.click(screen.getByRole('button', { name: '更新' }));
+
+    await waitFor(() => expect(screen.queryByText('案件を編集')).not.toBeInTheDocument());
+    const patch = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH');
+    const body = JSON.parse(String((patch![1] as RequestInit).body));
+    expect(body.memo).toBe('9/30 面接日程の連絡あり');
+    expect(body.status).toBe('書類選考');
+
+    // 詳細パネルは開いたままで、再取得した内容(追記したメモ)がそのまま読める。
+    const panel = within(screen.getByRole('dialog'));
+    await waitFor(() => expect(panel.getByText('9/30 面接日程の連絡あり')).toBeInTheDocument());
+    expect(panel.getByRole('button', { name: 'メモを追記・編集' })).toBeInTheDocument();
+  });
+
   it('削除確認後にDELETE /api/projects/{id}を呼び出し、一覧を再取得する', async () => {
     fetchMock.mockImplementation((url: string, options?: RequestInit) => {
       if (url.includes('/api/projects/1') && options?.method === 'DELETE') {
@@ -444,20 +600,39 @@ describe('AppRoot', () => {
     render(<AppRoot />);
     await startDemo();
 
-    const detailButtons = screen.getAllByRole('button', { name: /の詳細を開く$/ });
-    expect(detailButtons).toHaveLength(4);
+    expect(screen.getAllByRole('button', { name: /の詳細を開く$/ })).toHaveLength(4);
 
-    // 詳細パネルは1件ずつ。転職3件を順に開き、副業OK/NG/不明がそろうことを見る。
-    const expected = ['副業OK', '副業NG', '不明'];
-    for (let i = 0; i < expected.length; i += 1) {
-      fireEvent.click(detailButtons[i]);
+    // 詳細パネルは1件ずつ。転職3件を開き、副業OK/NG/不明がそろうことを見る。
+    // (一覧は進み具合順に並ぶので、位置ではなく案件名で開く)
+    const expected: [string, string][] = [
+      ['バックエンドエンジニア（Go / 決済基盤）', '副業OK'],
+      ['フロントエンドエンジニア（React / 自社SaaS）', '副業NG'],
+      ['社内DXエンジニア（業務システム改善）', '不明'],
+    ];
+    for (const [name, allowed] of expected) {
+      fireEvent.click(screen.getByRole('button', { name: `${name} の詳細を開く` }));
       const panel = within(screen.getByRole('dialog'));
-      expect(panel.getByText(expected[i])).toBeInTheDocument();
+      expect(panel.getByText(allowed)).toBeInTheDocument();
 
       // 閲覧だけ。DBを変える操作はパネルにも存在しない。
       expect(screen.queryByRole('button', { name: '編集' })).not.toBeInTheDocument();
       expect(screen.queryByRole('button', { name: 'ゴミ箱へ移動' })).not.toBeInTheDocument();
     }
+  });
+
+  it('デモ案件も同じ並び順(進み具合 → 更新日時)で表示される', async () => {
+    render(<AppRoot />);
+    await startDemo();
+
+    const names = screen
+      .getAllByRole('button', { name: /の詳細を開く$/ })
+      .map(b => (b.getAttribute('aria-label') ?? '').replace(/ の詳細を開く$/, ''));
+    expect(names).toEqual([
+      'コーポレートサイトのリニューアル', // 副業・作業中
+      'バックエンドエンジニア（Go / 決済基盤）', // 面接
+      'フロントエンドエンジニア（React / 自社SaaS）', // 書類選考
+      '社内DXエンジニア（業務システム改善）', // 応募済み
+    ]);
   });
 
   it('デモ中でも詳細パネルは開き、閉じれば一覧だけに戻る', async () => {

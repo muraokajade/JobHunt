@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo, useRef } from 'react';
 import { Project, ProjectFormData, ApiValidationErrors, ProjectType } from './types/project';
 import { computeStatusSummary } from './utils/projectSummary';
+import { sortProjectsForList } from './utils/projectSort';
 import { listProjects, createProject, updateProject, deleteProject } from './api/projects';
 import ProjectModal, { ProjectModalNotice } from './ProjectModal';
 import ProjectCard, { ProjectListHeader } from './components/ProjectCard';
@@ -39,6 +40,8 @@ function AppRoot() {
   const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [createInitialData, setCreateInitialData] = useState<ProjectFormData | undefined>(undefined);
   const [createNotice, setCreateNotice] = useState<ProjectModalNotice | null>(null);
+  /** 編集フォームを開いたときに最初に入力できる状態にする項目(詳細パネルの「メモ」から開いたとき)。 */
+  const [editFocus, setEditFocus] = useState<'memo' | undefined>(undefined);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [modalErrors, setModalErrors] = useState<Record<string, string[]> | undefined>(undefined);
   const [deletingId, setDeletingId] = useState<number | null>(null);
@@ -141,8 +144,14 @@ function AppRoot() {
   /**
    * 一覧に出す案件。デモ中は架空案件だけを出し、APIから取得した実データ(projects)とは混ぜない。
    * projects自体はデモ中も一切書き換えないので、デモを終了すれば元の状態へそのまま戻る。
+   *
+   * 並び順は「選考の進み具合 → 更新日時」(sortProjectsForList)。
+   * 種別・検索の絞り込みはAPI側で済んでいるので、その結果に対して同じ順序を適用する。
    */
-  const displayProjects = demoMode ? demoProjects : projects;
+  const displayProjects = useMemo(
+    () => sortProjectsForList(demoMode ? demoProjects : projects),
+    [demoMode, demoProjects, projects],
+  );
 
   const summary = useMemo(() => computeStatusSummary(displayProjects), [displayProjects]);
 
@@ -219,6 +228,7 @@ function AppRoot() {
     setModalErrors(undefined);
     setCreateInitialData(undefined);
     setCreateNotice(null);
+    setEditFocus(undefined);
   };
 
   const handleCreate = async (data: ProjectFormData) => {
@@ -337,8 +347,9 @@ function AppRoot() {
     setModalOpen(true);
   };
 
-  const openEdit = (p: Project) => {
+  const openEdit = (p: Project, focus?: 'memo') => {
     setEditingProject(p);
+    setEditFocus(focus);
     setCreateInitialData(undefined);
     setCreateNotice(null);
     setModalErrors(undefined);
@@ -627,10 +638,11 @@ function AppRoot() {
         project={selectedProject}
         variant={demoMode ? 'demo' : 'active'}
         onClose={() => setSelectedId(null)}
-        onEdit={project => {
-          setSelectedId(null);
-          openEdit(project);
-        }}
+        /*
+          編集中も詳細パネルは閉じない。保存後の再取得で、追記したメモや修正内容が
+          そのままパネルに反映されて見える(編集フォームはパネルより手前に重なる)。
+        */
+        onEdit={(project, focus) => openEdit(project, focus)}
         onStatusChange={handleStatusChange}
         onDelete={handleDelete}
         deleting={selectedProject !== null && deletingId === selectedProject.id}
@@ -642,6 +654,7 @@ function AppRoot() {
         project={editingProject}
         initialData={editingProject ? undefined : createInitialData}
         notice={editingProject ? null : createNotice}
+        initialFocus={editingProject ? editFocus : undefined}
         isSubmitting={isSubmitting}
         errors={modalErrors}
         onClose={closeModal}

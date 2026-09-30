@@ -29,7 +29,8 @@ interface ProjectDetailPanelProps {
    */
   variant: 'active' | 'trash' | 'demo';
   onClose: () => void;
-  onEdit?: (project: Project) => void;
+  /** focus='memo' は「メモを書く」から開いたとき(編集フォームでメモ欄へ直接移る)。 */
+  onEdit?: (project: Project, focus?: 'memo') => void;
   /**
    * ステータスだけを保存する(variant="active"のときだけ使う)。
    * 保存が終わる(成功・失敗どちらでも)までPromiseを解決しないこと。
@@ -242,6 +243,33 @@ export default function ProjectDetailPanel({
             </dl>
           </Section>
 
+          {/*
+            活動メモ(保存先はmemo)。登録後に企業から届いた情報や、自分の判断を書き足していく場所。
+            通常一覧では空でも枠を出し、ここに記録できることと、書き始める入口を示す。
+            ゴミ箱・デモは書き込めないので、中身があるときだけ出す。
+          */}
+          {(variant === 'active' || p.memo) && (
+            <Section>
+              <div className="mb-1 flex items-center justify-between gap-2">
+                <h3 className="text-xs text-slate-400">活動メモ</h3>
+                {variant === 'active' && onEdit && (
+                  <button
+                    type="button"
+                    onClick={() => onEdit(p, 'memo')}
+                    className="-my-2 flex min-h-11 items-center rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 md:min-h-8"
+                  >
+                    {p.memo ? 'メモを追記・編集' : 'メモを書く'}
+                  </button>
+                )}
+              </div>
+              {p.memo ? (
+                <p className="text-sm break-words whitespace-pre-wrap text-slate-700">{p.memo}</p>
+              ) : (
+                <p className="text-sm text-slate-400">企業から後で届いた情報や選考メモを、ここに記録できます。</p>
+              )}
+            </Section>
+          )}
+
           {p.description && (
             <Section>
               <dl>
@@ -272,12 +300,11 @@ export default function ProjectDetailPanel({
             </Section>
           )}
 
-          {(p.next_action || p.next_action_date || p.memo) && (
+          {(p.next_action || p.next_action_date) && (
             <Section>
               <dl className="space-y-3">
                 <Field label="次アクション" value={p.next_action} />
                 <Field label="次アクション日" value={p.next_action_date?.slice(0, 10)} />
-                <Field label="メモ" value={p.memo} />
               </dl>
             </Section>
           )}

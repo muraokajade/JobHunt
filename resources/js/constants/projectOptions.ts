@@ -75,3 +75,45 @@ export const STATUS_GROUP_STYLES: Record<StatusGroup, { dot: string; text: strin
 export function statusStyle(status: string) {
   return STATUS_GROUP_STYLES[statusGroupOf(status)];
 }
+
+/**
+ * 一覧の既定の並び順に使う「選考の進み具合」。大きいほど上に出す。
+ *
+ * 転職と副業が混ざった一覧でも比べられるよう、同じ尺度に置いている
+ * (例: 副業の契約は、転職の面接と同じ段)。同じ値どうしは更新日時の新しい順に並べる。
+ *
+ * 終了した案件は進行中の案件より上に出さない。
+ * 例外は内定で、承諾・辞退の判断が残る最重要の状態なので最上位に置く。
+ * 副業の完了と見送りは「対応中 / 終了」の集計でも終了側なので、一覧の最後へ回す。
+ * 定義に無いステータス(旧データ等)は「気になる」と同じ0として扱う。
+ */
+const CAREER_STATUS_SORT_RANKS: Record<string, number> = {
+  '内定': 60,
+  '最終面接': 50,
+  '面接': 40,
+  '書類選考': 30,
+  '応募済み': 20,
+  '応募準備': 10,
+  '気になる': 0,
+  '見送り': -20,
+};
+
+const SIDE_JOB_STATUS_SORT_RANKS: Record<string, number> = {
+  '検収待ち': 52,
+  '納品': 51,
+  '作業中': 50,
+  '契約': 40,
+  '選考中': 31,
+  '面談': 30,
+  '返信待ち': 21,
+  '応募済み': 20,
+  '応募準備': 10,
+  '気になる': 0,
+  '完了': -10,
+  '見送り': -20,
+};
+
+export function statusSortRank(type: ProjectType, status: string): number {
+  const ranks = type === 'career' ? CAREER_STATUS_SORT_RANKS : SIDE_JOB_STATUS_SORT_RANKS;
+  return ranks[status] ?? 0;
+}

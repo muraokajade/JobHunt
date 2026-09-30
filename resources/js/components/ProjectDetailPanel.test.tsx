@@ -114,7 +114,7 @@ describe('ProjectDetailPanel 表示項目', () => {
 
     const p = panel();
     for (const label of ['報酬', '応募締切', 'クライアント', '媒体', 'カテゴリ', '応募日',
-                         '募集内容', '案件URL', '次アクション', 'メモ', '職種', '勤務地', '雇用形態']) {
+                         '募集内容', '案件URL', '次アクション', '活動メモ', '職種', '勤務地', '雇用形態']) {
       expect(p.getByText(label)).toBeInTheDocument();
     }
     expect(p.getByText('転職専用項目')).toBeInTheDocument();
@@ -131,9 +131,8 @@ describe('ProjectDetailPanel 表示項目', () => {
   it('空欄の項目は表示しない', () => {
     render(<ProjectDetailPanel project={makeProject({ memo: null, category: null })} variant="active" onClose={() => {}} />);
 
-    const p = panel();
-    expect(p.queryByText('メモ')).not.toBeInTheDocument();
-    expect(p.queryByText('カテゴリ')).not.toBeInTheDocument();
+    expect(panel().queryByText('カテゴリ')).not.toBeInTheDocument();
+    expect(panel().queryByText('次アクション')).not.toBeInTheDocument();
   });
 
   it('priorityが設定されていても表示しない', () => {
@@ -463,5 +462,58 @@ describe('ProjectDetailPanel ステータスの直接変更', () => {
 
     expect(statusSelect()).toHaveClass('text-slate-400');
     expect(statusSelect()).not.toHaveClass('bg-blue-50');
+  });
+});
+
+describe('ProjectDetailPanel 活動メモ', () => {
+  it('保存済みのメモを「活動メモ」として改行を保って表示し、追記・編集の入口を出す', () => {
+    const onEdit = vi.fn();
+    const project = makeProject({ memo: '9/30 面接日程の連絡あり\n10/2 19:00 一次面接' });
+    render(<ProjectDetailPanel project={project} variant="active" onClose={() => {}} onEdit={onEdit} />);
+
+    expect(panel().getByText('活動メモ')).toBeInTheDocument();
+    const body = panel().getByText(/9\/30 面接日程の連絡あり/);
+    expect(body).toHaveClass('whitespace-pre-wrap');
+    expect(body.textContent).toContain('10/2 19:00 一次面接');
+
+    fireEvent.click(screen.getByRole('button', { name: 'メモを追記・編集' }));
+    expect(onEdit).toHaveBeenCalledWith(project, 'memo');
+  });
+
+  it('メモが空でも、ここに記録できることと書き始める入口を示す', () => {
+    const onEdit = vi.fn();
+    const project = makeProject({ memo: null });
+    render(<ProjectDetailPanel project={project} variant="active" onClose={() => {}} onEdit={onEdit} />);
+
+    expect(panel().getByText('活動メモ')).toBeInTheDocument();
+    expect(panel().getByText('企業から後で届いた情報や選考メモを、ここに記録できます。')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'メモを書く' }));
+    expect(onEdit).toHaveBeenCalledWith(project, 'memo');
+  });
+
+  it('既存の「編集」ボタンはそのまま残る', () => {
+    const onEdit = vi.fn();
+    const project = makeProject();
+    render(<ProjectDetailPanel project={project} variant="active" onClose={() => {}} onEdit={onEdit} />);
+
+    fireEvent.click(screen.getByRole('button', { name: '編集' }));
+    expect(onEdit).toHaveBeenCalledWith(project);
+  });
+
+  it('ゴミ箱・デモでは書き込めないので、メモがあるときだけ表示し入口は出さない', () => {
+    for (const variant of ['trash', 'demo'] as const) {
+      const withMemo = render(
+        <ProjectDetailPanel project={makeProject({ memo: '返信済み、結果待ち' })} variant={variant} onClose={() => {}} onEdit={() => {}} />
+      );
+      expect(panel().getByText('返信済み、結果待ち')).toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /メモを/ })).not.toBeInTheDocument();
+      withMemo.unmount();
+
+      const empty = render(
+        <ProjectDetailPanel project={makeProject({ memo: null })} variant={variant} onClose={() => {}} onEdit={() => {}} />
+      );
+      expect(panel().queryByText('活動メモ')).not.toBeInTheDocument();
+      empty.unmount();
+    }
   });
 });
