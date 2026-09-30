@@ -250,23 +250,44 @@ export default function ProjectDetailPanel({
           */}
           {(variant === 'active' || p.memo) && (
             <Section>
-              <div className="mb-1 flex items-center justify-between gap-2">
-                <h3 className="text-xs text-slate-400">活動メモ</h3>
-                {variant === 'active' && onEdit && (
-                  <button
-                    type="button"
-                    onClick={() => onEdit(p, 'memo')}
-                    className="-my-2 flex min-h-11 items-center rounded-md px-2 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-slate-800 md:min-h-8"
-                  >
-                    {p.memo ? 'メモを追記・編集' : 'メモを書く'}
-                  </button>
+              <section aria-labelledby="activity-memo-heading">
+                {/* 見出しは他の項目名(薄い小さな文字)より一段強くして、独立した枠だと分かるようにする。 */}
+                <div className="flex items-center justify-between gap-2">
+                  <h3 id="activity-memo-heading" className="text-sm font-medium text-slate-800">活動メモ</h3>
+                  {p.memo && variant === 'active' && onEdit && (
+                    <button
+                      type="button"
+                      onClick={() => onEdit(p, 'memo')}
+                      aria-label="活動メモを編集"
+                      className="flex min-h-11 items-center rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-700 hover:bg-slate-50 md:min-h-8"
+                    >
+                      編集
+                    </button>
+                  )}
+                </div>
+
+                {p.memo ? (
+                  <p className="mt-2 rounded-md bg-slate-50 px-3 py-2.5 text-sm leading-relaxed break-words whitespace-pre-wrap text-slate-700">
+                    {p.memo}
+                  </p>
+                ) : (
+                  <>
+                    <p className="mt-1 text-xs text-slate-500">企業から届いた追加情報や、面接・選考のメモを残せます。</p>
+                    {onEdit && (
+                      <button
+                        type="button"
+                        onClick={() => onEdit(p, 'memo')}
+                        className="mt-3 flex min-h-11 w-full items-center justify-center gap-1.5 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-700 hover:bg-slate-50 sm:w-auto md:min-h-9"
+                      >
+                        <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true" className="h-4 w-4">
+                          <path d="M10 4.5v11M4.5 10h11" />
+                        </svg>
+                        活動メモを追加
+                      </button>
+                    )}
+                  </>
                 )}
-              </div>
-              {p.memo ? (
-                <p className="text-sm break-words whitespace-pre-wrap text-slate-700">{p.memo}</p>
-              ) : (
-                <p className="text-sm text-slate-400">企業から後で届いた情報や選考メモを、ここに記録できます。</p>
-              )}
+              </section>
             </Section>
           )}
 

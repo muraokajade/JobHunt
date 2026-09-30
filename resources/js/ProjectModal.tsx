@@ -40,6 +40,18 @@ interface ProjectModalProps {
 const FIELD_CLASS =
   'min-h-11 w-full rounded-md border border-slate-300 px-3 py-2 text-base focus:ring-2 focus:ring-slate-400 focus:outline-none sm:min-h-9 sm:text-sm';
 
+/**
+ * フォームの初期値。
+ *   編集   : 保存済みの内容(ステータスも保存済みの値のまま。既定値で上書きしない)
+ *   URL取込: 取込結果(previewToFormData。ステータスは新規登録の既定「応募済み」)
+ *   手入力 : 空のフォーム(emptyFormData。ステータスは「応募済み」)
+ */
+function initialFormFor(mode: 'create' | 'edit', project: Project | null, initialData?: ProjectFormData): ProjectFormData {
+  // projectToFormData側で、選択肢に無い媒体名は「その他」+自由入力欄へ分解される。
+  if (mode === 'edit' && project) return projectToFormData(project);
+  return initialData ?? emptyFormData();
+}
+
 export default function ProjectModal({
   open,
   mode,
@@ -52,23 +64,29 @@ export default function ProjectModal({
   onClose,
   onSubmit,
 }: ProjectModalProps) {
-  const [form, setForm] = useState<ProjectFormData>(emptyFormData());
+  const [form, setForm] = useState<ProjectFormData>(() => initialFormFor(mode, project, initialData));
   const [error, setError] = useState('');
   const memoRef = useRef<HTMLTextAreaElement>(null);
 
-  const fieldError = (name: string) => errors?.[name]?.[0];
-
-  useEffect(() => {
-    if (mode === 'edit' && project) {
-      // projectToFormData側で、選択肢に無い媒体名は「その他」+自由入力欄へ分解される。
-      setForm(projectToFormData(project));
-    } else if (initialData) {
-      setForm(initialData);
-    } else {
-      setForm(emptyFormData());
-    }
+  /*
+    開き直し・対象の切り替えのたびに、フォームを初期値へ戻す。
+    useEffectで戻すと、URL取込のように非同期で開いたとき、描画後に効果が走るまでの間
+    取込内容の入っていない前回の状態のフォームが一瞬描画される(その間に押すと空の案件名で弾かれる)。
+    そこで、props が変わったその描画の中で同期的に作り直す(Reactの「前回のpropsとの比較」パターン)。
+  */
+  const [formSource, setFormSource] = useState({ open, mode, project, initialData });
+  if (
+    formSource.open !== open ||
+    formSource.mode !== mode ||
+    formSource.project !== project ||
+    formSource.initialData !== initialData
+  ) {
+    setFormSource({ open, mode, project, initialData });
+    setForm(initialFormFor(mode, project, initialData));
     setError('');
-  }, [mode, project, initialData, open]);
+  }
+
+  const fieldError = (name: string) => errors?.[name]?.[0];
 
   // メモを書くために開いたときは、長いフォームを下までたどらせず、メモ欄へ直接移る。
   useEffect(() => {

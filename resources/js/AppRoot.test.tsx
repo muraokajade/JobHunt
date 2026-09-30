@@ -359,8 +359,8 @@ describe('AppRoot', () => {
     fireEvent.click(screen.getByRole('button', { name: '求人情報を読み込む' }));
 
     await waitFor(() => expect(screen.getByText('案件を登録')).toBeInTheDocument());
-    // 取込結果がフォームへ入るのを待ってから登録する(取込内容を引き継いだ状態で送信されることを見る)。
-    await waitFor(() => expect(screen.getByDisplayValue('取込した求人')).toBeInTheDocument());
+    // フォームが表示されたその時点で、取込内容と「応募済み」が入っている(後から入れ替わらない)。
+    expect(screen.getByDisplayValue('取込した求人')).toBeInTheDocument();
     expect((screen.getByLabelText('ステータス') as HTMLSelectElement).value).toBe('応募済み');
     fireEvent.click(screen.getByRole('button', { name: '登録' }));
 
@@ -373,7 +373,7 @@ describe('AppRoot', () => {
     });
   });
 
-  it('詳細パネルの「メモを書く」から活動メモを保存でき、保存後はパネルにそのまま表示される(ステータスは保存済みのまま)', async () => {
+  it('詳細パネルの「活動メモを追加」から活動メモを保存でき、保存後はパネルにそのまま表示される(ステータスは保存済みのまま)', async () => {
     let memo: string | null = null;
     fetchMock.mockImplementation((url: string, options?: RequestInit) => {
       if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
@@ -388,9 +388,9 @@ describe('AppRoot', () => {
     await waitFor(() => expect(screen.getByText('メモ案件')).toBeInTheDocument());
 
     fireEvent.click(screen.getByRole('button', { name: 'メモ案件 の詳細を開く' }));
-    fireEvent.click(screen.getByRole('button', { name: 'メモを書く' }));
+    fireEvent.click(screen.getByRole('button', { name: '活動メモを追加' }));
 
-    const memoField = screen.getByLabelText('活動メモ');
+    const memoField = screen.getByRole('textbox', { name: '活動メモ' });
     expect(memoField).toHaveFocus();
     fireEvent.change(memoField, { target: { value: '9/30 面接日程の連絡あり' } });
     fireEvent.click(screen.getByRole('button', { name: '更新' }));
@@ -404,7 +404,54 @@ describe('AppRoot', () => {
     // 詳細パネルは開いたままで、再取得した内容(追記したメモ)がそのまま読める。
     const panel = within(screen.getByRole('dialog'));
     await waitFor(() => expect(panel.getByText('9/30 面接日程の連絡あり')).toBeInTheDocument());
-    expect(panel.getByRole('button', { name: 'メモを追記・編集' })).toBeInTheDocument();
+    expect(panel.getByRole('button', { name: '活動メモを編集' })).toBeInTheDocument();
+  });
+
+  it('既存案件の編集では保存済みのステータス(気になる)を維持し、応募済みで上書きしない', async () => {
+    fetchMock.mockImplementation((url: string, options?: RequestInit) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      if (options?.method === 'PATCH') {
+        return Promise.resolve(jsonResponse(200, { data: makeProject({ id: 7, name: '保留中の案件', type: 'career', status: '気になる' }) }));
+      }
+      return Promise.resolve(jsonResponse(200, { data: [makeProject({ id: 7, name: '保留中の案件', type: 'career', status: '気になる' })] }));
+    });
+
+    render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('保留中の案件')).toBeInTheDocument());
+
+    fireEvent.click(screen.getByRole('button', { name: '保留中の案件 の詳細を開く' }));
+    fireEvent.click(screen.getByRole('button', { name: '編集' }));
+
+    expect(screen.getByText('案件を編集')).toBeInTheDocument();
+    // 詳細パネルは開いたままなので、編集フォーム側(id="status")のステータス欄を見る。
+    expect((document.getElementById('status') as HTMLSelectElement).value).toBe('気になる');
+    fireEvent.click(screen.getByRole('button', { name: '更新' }));
+
+    await waitFor(() => {
+      const patch = fetchMock.mock.calls.find(([, init]) => (init as RequestInit | undefined)?.method === 'PATCH');
+      expect(patch).toBeDefined();
+      expect(JSON.parse(String((patch![1] as RequestInit).body)).status).toBe('気になる');
+    });
+  });
+
+  it('手入力の登録フォームは、開いた時点で「応募済み」が選択されている(編集を閉じた直後でも)', async () => {
+    fetchMock.mockImplementation((url: string) => {
+      if (url.includes('/api/auth/me')) return Promise.resolve(jsonResponse(200, { data: AUTH_USER }));
+      return Promise.resolve(jsonResponse(200, { data: [makeProject({ id: 7, name: '保留中の案件', type: 'career', status: '気になる' })] }));
+    });
+
+    render(<AppRoot />);
+    await waitFor(() => expect(screen.getByText('保留中の案件')).toBeInTheDocument());
+
+    // 「気になる」の案件を編集で開いて閉じたあとに、新規登録を開く。
+    fireEvent.click(screen.getByRole('button', { name: '保留中の案件 の詳細を開く' }));
+    fireEvent.click(screen.getByRole('button', { name: '編集' }));
+    fireEvent.click(screen.getByRole('button', { name: 'キャンセル' }));
+    fireEvent.click(screen.getByRole('button', { name: '手入力' }));
+
+    expect(screen.getByText('案件を登録')).toBeInTheDocument();
+    expect((screen.getByLabelText('ステータス') as HTMLSelectElement).value).toBe('応募済み');
+    expect((screen.getByLabelText('種別') as HTMLSelectElement).value).toBe('');
   });
 
   it('削除確認後にDELETE /api/projects/{id}を呼び出し、一覧を再取得する', async () => {

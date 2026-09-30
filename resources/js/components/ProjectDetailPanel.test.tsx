@@ -466,28 +466,43 @@ describe('ProjectDetailPanel ステータスの直接変更', () => {
 });
 
 describe('ProjectDetailPanel 活動メモ', () => {
-  it('保存済みのメモを「活動メモ」として改行を保って表示し、追記・編集の入口を出す', () => {
+  it('「活動メモ」を見出し付きの独立したセクションとして出す', () => {
+    render(<ProjectDetailPanel project={makeProject({ memo: null })} variant="active" onClose={() => {}} onEdit={() => {}} />);
+
+    const section = panel().getByRole('region', { name: '活動メモ' });
+    expect(within(section).getByRole('heading', { name: '活動メモ' })).toHaveClass('text-sm', 'font-medium');
+  });
+
+  it('メモがあれば本文を改行を保って読みやすく表示し、右上に枠付きの「編集」ボタンを出す', () => {
     const onEdit = vi.fn();
-    const project = makeProject({ memo: '9/30 面接日程の連絡あり\n10/2 19:00 一次面接' });
+    const project = makeProject({ memo: '9/30 面接日程の連絡あり\n10/2 19:00 一次面接\nPHP経験について質問あり' });
     render(<ProjectDetailPanel project={project} variant="active" onClose={() => {}} onEdit={onEdit} />);
 
-    expect(panel().getByText('活動メモ')).toBeInTheDocument();
     const body = panel().getByText(/9\/30 面接日程の連絡あり/);
-    expect(body).toHaveClass('whitespace-pre-wrap');
-    expect(body.textContent).toContain('10/2 19:00 一次面接');
+    expect(body).toHaveClass('whitespace-pre-wrap', 'bg-slate-50');
+    expect(body.textContent).toContain('PHP経験について質問あり');
 
-    fireEvent.click(screen.getByRole('button', { name: 'メモを追記・編集' }));
+    const edit = screen.getByRole('button', { name: '活動メモを編集' });
+    expect(edit).toHaveTextContent('編集');
+    expect(edit).toHaveClass('border', 'bg-white', 'hover:bg-slate-50', 'min-h-11');
+    expect(screen.queryByRole('button', { name: '活動メモを追加' })).not.toBeInTheDocument();
+
+    fireEvent.click(edit);
     expect(onEdit).toHaveBeenCalledWith(project, 'memo');
   });
 
-  it('メモが空でも、ここに記録できることと書き始める入口を示す', () => {
+  it('メモが空なら短い説明と、枠付きの「＋ 活動メモを追加」ボタンを出す', () => {
     const onEdit = vi.fn();
     const project = makeProject({ memo: null });
     render(<ProjectDetailPanel project={project} variant="active" onClose={() => {}} onEdit={onEdit} />);
 
-    expect(panel().getByText('活動メモ')).toBeInTheDocument();
-    expect(panel().getByText('企業から後で届いた情報や選考メモを、ここに記録できます。')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: 'メモを書く' }));
+    expect(panel().getByText('企業から届いた追加情報や、面接・選考のメモを残せます。')).toBeInTheDocument();
+    const add = screen.getByRole('button', { name: '活動メモを追加' });
+    expect(add).toHaveClass('border', 'bg-white', 'hover:bg-slate-50', 'min-h-11');
+    expect(add.querySelector('svg')).not.toBeNull();
+    expect(screen.queryByRole('button', { name: '活動メモを編集' })).not.toBeInTheDocument();
+
+    fireEvent.click(add);
     expect(onEdit).toHaveBeenCalledWith(project, 'memo');
   });
 
@@ -506,7 +521,7 @@ describe('ProjectDetailPanel 活動メモ', () => {
         <ProjectDetailPanel project={makeProject({ memo: '返信済み、結果待ち' })} variant={variant} onClose={() => {}} onEdit={() => {}} />
       );
       expect(panel().getByText('返信済み、結果待ち')).toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /メモを/ })).not.toBeInTheDocument();
+      expect(screen.queryByRole('button', { name: /活動メモを/ })).not.toBeInTheDocument();
       withMemo.unmount();
 
       const empty = render(
