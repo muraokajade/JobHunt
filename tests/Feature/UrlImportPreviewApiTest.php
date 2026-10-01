@@ -269,6 +269,93 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
         $response->assertStatus(200)->assertJsonPath('data.name', 'プロトコル相対リダイレクト先');
     }
 
+    // ---- 送信URLのホスト名 = 検証・接続固定したホスト名 (DNS rebinding対策) ----
+    //
+    // 入力の表記(末尾ドット等)のまま送ると、cURLのCURLOPT_RESOLVE(接続先IPの固定)が一致せず、
+    // cURLがDNSを引き直して検証していないIPへ接続しうる。送信は必ず検証済みのホスト名で行う。
+
+    public function test_trailing_dot_hostname_is_sent_with_the_verified_hostname(): void
+    {
+        $this->fakeDns(['example.com' => ['8.8.8.8']]);
+        Http::fake(['*' => Http::response(
+            '<html><head><title>末尾ドット</title></head></html>',
+            200,
+            ['Content-Type' => 'text/html']
+        )]);
+
+        $response = $this->postJson('/api/import/preview', ['url' => 'https://example.com./job?id=1']);
+
+        $response->assertStatus(200)->assertJsonPath('data.name', '末尾ドット');
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://example.com/job?id=1');
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'example.com.'));
+    }
+
+    public function test_unicode_hostname_is_sent_as_punycode(): void
+    {
+        $this->fakeDns(['xn--wgv71a119e.example' => ['8.8.8.8']]);
+        Http::fake(['*' => Http::response(
+            '<html><head><title>国際化ドメイン</title></head></html>',
+            200,
+            ['Content-Type' => 'text/html']
+        )]);
+
+        $response = $this->postJson('/api/import/preview', ['url' => 'https://日本語.example/job?id=1']);
+
+        $response->assertStatus(200)->assertJsonPath('data.name', '国際化ドメイン');
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://xn--wgv71a119e.example/job?id=1');
+    }
+
+    public function test_redirect_to_trailing_dot_hostname_is_revalidated_and_sent_with_the_verified_hostname(): void
+    {
+        $this->fakeDns([
+            'example.com' => ['8.8.8.8'],
+            'other.example' => ['8.8.4.4'],
+        ]);
+        Http::fake([
+            'https://example.com/start' => Http::response('', 302, ['Location' => 'https://other.example./next?x=1']),
+            'https://other.example/next?x=1' => Http::response(
+                '<html><head><title>リダイレクト先</title></head></html>',
+                200,
+                ['Content-Type' => 'text/html']
+            ),
+        ]);
+
+        $response = $this->postJson('/api/import/preview', ['url' => 'https://example.com/start']);
+
+        $response->assertStatus(200)->assertJsonPath('data.name', 'リダイレクト先');
+        Http::assertSent(fn (Request $request) => $request->url() === 'https://other.example/next?x=1');
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'other.example.'));
+    }
+
+    public function test_redirect_to_trailing_dot_hostname_resolving_to_private_ip_is_rejected(): void
+    {
+        // 末尾ドット付きでも、リダイレクト先は正規化したホスト名で改めて解決・検査され、拒否される。
+        $this->fakeDns([
+            'example.com' => ['8.8.8.8'],
+            'internal.example' => ['10.0.0.9'],
+        ]);
+        Http::fake([
+            'https://example.com/start' => Http::response('', 302, ['Location' => 'https://internal.example./admin']),
+        ]);
+
+        $response = $this->postJson('/api/import/preview', ['url' => 'https://example.com/start']);
+
+        $response->assertStatus(422)->assertJsonPath('error_code', 'blocked_host');
+        Http::assertNotSent(fn (Request $request) => str_contains($request->url(), 'internal.example'));
+    }
+
+    public function test_non_standard_numeric_hostname_is_rejected_and_nothing_is_sent(): void
+    {
+        // cURLは"2130706433"を127.0.0.1と解釈して直接接続する。DNSが公開IPを返す最悪の条件でも拒否する。
+        $this->fakeDns(['2130706433' => ['8.8.8.8']]);
+        Http::fake(['*' => Http::response('<html></html>', 200, ['Content-Type' => 'text/html'])]);
+
+        $response = $this->postJson('/api/import/preview', ['url' => 'http://2130706433/admin']);
+
+        $response->assertStatus(422)->assertJsonPath('error_code', 'invalid_url');
+        Http::assertNothingSent();
+    }
+
     // ---- 取得失敗の分類 --------------------------------------------------
 
     public function test_remote_403_leads_to_manual_entry_instead_of_a_raw_error(): void

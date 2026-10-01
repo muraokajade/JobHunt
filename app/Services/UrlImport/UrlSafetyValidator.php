@@ -72,6 +72,14 @@ class UrlSafetyValidator
             }
         }
 
+        // 標準形式のIP以外で「最後のラベルが数値」のホスト名(2130706433・0x7f.1・127.1・0177.0.0.1等)は、
+        // DNS解決より前に拒否する。cURL/ブラウザ(WHATWG URL)はこれらをIPv4アドレスとして解釈し直して
+        // 直接接続するため、ここでDNS名として検証すると、検証した接続先と実際の接続先が食い違う。
+        // 数値のみのTLDは存在しないので、正規のホスト名(123.example.com等)はこの条件に当たらない。
+        if (filter_var($host, FILTER_VALIDATE_IP) === false && self::endsInNumber($host)) {
+            throw new UrlSafetyException('invalid_url', 'URLを解釈できませんでした。');
+        }
+
         $ips = filter_var($host, FILTER_VALIDATE_IP) !== false
             ? [$host]
             : $this->resolver->resolve($host);
@@ -87,6 +95,19 @@ class UrlSafetyValidator
         }
 
         return ['scheme' => $scheme, 'host' => $host, 'port' => $defaultPort, 'ips' => $ips];
+    }
+
+    /**
+     * WHATWG URL Standardの「ends in a number」判定。最後のラベルが10進数字だけ、または
+     * 0x/0Xで始まる16進数のとき真。真ならURLパーサはホスト全体をIPv4アドレスとして解釈する。
+     * (末尾ドットはnormalizeHostで除去済み)
+     */
+    private static function endsInNumber(string $host): bool
+    {
+        $labels = explode('.', $host);
+        $last = end($labels);
+
+        return $last !== '' && preg_match('/\A(?:[0-9]+|0x[0-9a-f]*)\z/i', $last) === 1;
     }
 
     /**

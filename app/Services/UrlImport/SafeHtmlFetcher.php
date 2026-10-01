@@ -4,6 +4,7 @@ namespace App\Services\UrlImport;
 
 use App\Exceptions\UrlImport\UrlFetchException;
 use App\Exceptions\UrlImport\UrlSafetyException;
+use GuzzleHttp\Psr7\Uri;
 use Illuminate\Http\Client\ConnectionException;
 use Illuminate\Http\Client\Response;
 use Illuminate\Support\Facades\Http;
@@ -18,8 +19,13 @@ use Illuminate\Support\Facades\Http;
  *
  * DNS rebinding/TOCTOU対策: UrlSafetyValidator::assertSafe()が返す検証済みIPを
  * PinnedConnectionOptionsでcURLのCURLOPT_RESOLVEへ渡し、実際の接続先をそのIPへ固定する。
- * リクエストURL・Hostヘッダー・TLSのSNI/証明書検証には元のホスト名を使い続けるため、
- * 「検証したIP」と「実際に接続するIP」が分離しない。
+ *
+ * CURLOPT_RESOLVEは「cURLが使うホスト名」と「固定したホスト名」が文字列として一致したときだけ効き、
+ * 一致しなければcURLは黙って自分でDNSを引き直す。そこで送信するURLのホスト名は、入力URLの表記
+ * (末尾ドット・大文字・Unicode/全角など)ではなく、検証済み・正規化済みのホスト名へ置き換える
+ * (buildRequestUrl)。さらに送信直前に両者の一致を確かめ、食い違えば送信せずに拒否する
+ * (assertRequestTargetsVerifiedHost)。Hostヘッダー・TLSのSNI/証明書検証もこのホスト名で行われる。
+ * これにより「検証したIP」と「実際に接続するIP」が分離しない。
  */
 class SafeHtmlFetcher
 {
@@ -58,7 +64,13 @@ class SafeHtmlFetcher
             // リダイレクト先でも毎回: URL検証→DNS解決→公開IP判定を必ずやり直す。
             $safety = $this->safetyValidator->assertSafe($currentUrl);
 
-            $response = $this->send($currentUrl, $safety, $this->remainingSeconds($deadline));
+            // 送信するURLのホスト名は、接続先を固定したホスト名と同じ(検証済み・正規化済み)ものにする。
+            // リダイレクト先の解決(相対パス等)は、利用者・取得先が示した元のURLを基準に行う。
+            $response = $this->send(
+                $this->buildRequestUrl($currentUrl, $safety),
+                $safety,
+                $this->remainingSeconds($deadline)
+            );
 
             if (in_array($response->status(), self::REDIRECT_STATUSES, true)) {
                 if ($hop === self::MAX_REDIRECTS) {
@@ -122,6 +134,50 @@ class SafeHtmlFetcher
     }
 
     /**
+     * 実際に送信するURLを作る。ホスト名だけを、UrlSafetyValidatorが検証・正規化したもの
+     * (小文字・末尾ドットなし・IDNはpunycode)へ置き換え、scheme・path・query・portはそのまま保つ。
+     * fragmentはサーバーへ送られないため落とす。
+     * (テストで直接確認できるよう独立したメソッドにしている)
+     *
+     * @param array{scheme: string, host: string, port: int, ips: list<string>} $safety
+     */
+    public function buildRequestUrl(string $url, array $safety): string
+    {
+        $host = filter_var($safety['host'], FILTER_VALIDATE_IP, FILTER_FLAG_IPV6) !== false
+            ? "[{$safety['host']}]"
+            : $safety['host'];
+
+        try {
+            return (string) (new Uri($url))->withHost($host)->withFragment('');
+        } catch (\InvalidArgumentException) {
+            // 検証は通ったがURLとして組み立て直せない場合も、送信せずに拒否する。
+            throw new UrlSafetyException('invalid_url', 'URLを解釈できませんでした。');
+        }
+    }
+
+    /**
+     * 送信直前の最終確認: 送信するURLのホスト名が、接続先を固定した(検証済みの)ホスト名と一致すること。
+     * 一致しなければCURLOPT_RESOLVEが効かずcURLがDNSを引き直すため、送信せずに拒否する。
+     *
+     * buildRequestUrlで同じ値から組み立てているので通常は必ず一致するが、送信の入口(send)で
+     * 不変条件として確かめておくことで、将来の変更で元のURLを渡してしまっても安全側に倒れる。
+     *
+     * @param array{scheme: string, host: string, port: int, ips: list<string>} $safety
+     */
+    public function assertRequestTargetsVerifiedHost(string $url, array $safety): void
+    {
+        try {
+            $host = strtolower(trim((new Uri($url))->getHost(), '[]'));
+        } catch (\InvalidArgumentException) {
+            $host = null;
+        }
+
+        if ($host !== $safety['host']) {
+            throw new UrlSafetyException('invalid_url', 'URLを解釈できませんでした。');
+        }
+    }
+
+    /**
      * 全体の締め切りまでの残り秒数。使い切っていればタイムアウトとして中断する。
      */
     private function remainingSeconds(float $deadline): int
@@ -138,6 +194,8 @@ class SafeHtmlFetcher
 
     private function send(string $url, array $safety, int $timeoutSeconds): Response
     {
+        $this->assertRequestTargetsVerifiedHost($url, $safety);
+
         try {
             return Http::withHeaders(['User-Agent' => self::USER_AGENT])
                 ->connectTimeout(min(self::CONNECT_TIMEOUT_SECONDS, $timeoutSeconds))

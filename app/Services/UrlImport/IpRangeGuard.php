@@ -42,6 +42,7 @@ final class IpRangeGuard
     private const BLOCKED_IPV6_CIDRS = [
         '::1/128',        // loopback
         '::/128',         // unspecified
+        '::/96',          // IPv4-compatible (非推奨, RFC 4291)。::127.0.0.1 等の埋め込みIPv4を通さない
         '64:ff9b::/96',   // NAT64
         '100::/64',       // discard-only
         '2001:db8::/32',  // documentation
