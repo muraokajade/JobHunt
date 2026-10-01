@@ -1,0 +1,88 @@
+# JobHunt CI
+#
+# main への push と、main 向けの pull request で、フロントエンドとバックエンドの品質チェックを実行する。
+# 本番の秘密情報(Neon 接続情報・本番 APP_KEY・Basic 認証のパスワード等)は一切使わない。
+# GitHub Secrets が無くても、リポジトリの内容だけで完結する。
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# このワークフローはリポジトリを読むだけでよい。
+permissions:
+  contents: read
+
+# 同じブランチ/PR で新しい実行が始まったら、古い実行は取り消す。
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  frontend:
+    name: Frontend (Vitest / TypeScript / Vite build)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24' # Dockerfile のビルドステージ(node:24)と同じ
+          cache: npm
+
+      - name: Install dependencies (package-lock.json)
+        run: npm ci
+
+      - name: Unit / component tests (Vitest)
+        run: npm run test
+
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Production build
+        run: npm run build
+
+  backend:
+    name: Backend (PHPUnit)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          # composer.lock に PHP 8.4.1 以上を要求するパッケージ(Symfony 8)があり、本番イメージも PHP 8.4。
+          php-version: '8.4'
+          # Laravel/PHPUnit の要件 + cURL(URL取込の接続固定) + SQLite(テスト用DB)。
+          # intl は不要(IDN 正規化は依存関係の symfony/polyfill-intl-idn が提供する)。
+          extensions: curl, dom, fileinfo, mbstring, pdo_sqlite, sqlite3, tokenizer, xml, xmlwriter
+          coverage: none
+          tools: composer:v2
+
+      # SPA を返すページ(/)のテストは、ビルド済みの Vite マニフェストを読み込む。
+      # 本番の Dockerfile と同じく、先にフロントエンドをビルドしておく。
+      - uses: actions/setup-node@v5
+        with:
+          node-version: '24'
+          cache: npm
+
+      - name: Build frontend assets for page rendering tests
+        run: |
+          npm ci
+          npm run build
+
+      - name: Install PHP dependencies (composer.lock)
+        run: composer install --no-interaction --no-progress --prefer-dist
+
+      # テスト専用の設定。DB は phpunit.xml の指定どおりメモリ上の SQLite を使い、外部の DB へは接続しない。
+      # APP_KEY はこの実行の中だけで使う使い捨ての値で、本番の鍵ではない。
+      - name: Prepare test environment
+        run: |
+          cp .env.example .env
+          php artisan key:generate
+
+      - name: Tests (PHPUnit)
+        run: php artisan test
