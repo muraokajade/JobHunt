@@ -632,7 +632,6 @@ function AppRoot() {
 
       {/*
         詳細。一覧の行を展開するのをやめ、PCは右パネル・スマホは下シートで出す。
-        表示している項目はこれまでの展開部と同じで、新しい情報は足していない。
       */}
       <ProjectDetailPanel
         project={selectedProject}

@@ -302,7 +302,7 @@ describe('ProjectModal', () => {
   it('既存type.jp案件を編集で開くと媒体がtypeで選択済みになる', () => {
     const project = {
       id: 1, type: 'career' as const, name: '案件',
-      project_url: 'https://type.jp/job-1/1344057_detail/', client_name: null,
+      project_url: 'https://type.jp/job-1/0000001_detail/', client_name: null,
       media: 'その他', category: null, description: null, applied_date: null, deadline: null,
       status: '気になる', reward: null, reward_text: null,
       working_hours: null, applicant_count: null, recruitment_count: null, application_text: null,

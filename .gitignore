@@ -27,3 +27,8 @@ Homestead.yaml
 Thumbs.db
 .vercel
 .env*
+
+# AIツールの出力・作業メタデータ(ポートフォリオには含めない)
+/Claude outputs/
+.kiro/**/*.meta.json
+.kiro/**/.config.kiro

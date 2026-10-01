@@ -43,7 +43,7 @@ class ManualEntryUrlDetectorTest extends TestCase
     public static function publicUrlProvider(): array
     {
         return [
-            'type 公開求人' => ['https://type.jp/job-1/1344057_detail/'],
+            'type 公開求人' => ['https://type.jp/job-1/0000001_detail/'],
             'type トップ' => ['https://type.jp/'],
             '別サイトで似たパス' => ['https://example.com/entry_history/1'],
             'CrowdWorks' => ['https://crowdworks.jp/public/jobs/123'],

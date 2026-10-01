@@ -4,7 +4,7 @@ import { MEDIA_OPTIONS } from '../constants/projectOptions';
 
 describe('mediaFromUrl URLからの媒体判定', () => {
   it('type.jpのURLはtypeと判定する', () => {
-    expect(mediaFromUrl('https://type.jp/job-1/1344057_detail/')).toBe('type');
+    expect(mediaFromUrl('https://type.jp/job-1/0000001_detail/')).toBe('type');
   });
 
   it('フリーランスハブのURLはフリーランスハブと判定する', () => {
@@ -52,7 +52,7 @@ describe('resolveMediaForDisplay 表示用の媒体', () => {
   it('既存type.jp案件の「その他」はURL判定でtypeになる', () => {
     expect(resolveMediaForDisplay({
       media: 'その他',
-      project_url: 'https://type.jp/job-1/1344057_detail/',
+      project_url: 'https://type.jp/job-1/0000001_detail/',
     })).toBe('type');
   });
 

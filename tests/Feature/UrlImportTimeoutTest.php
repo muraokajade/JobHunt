@@ -71,7 +71,7 @@ class UrlImportTimeoutTest extends AuthenticatedApiTestCase
         )]);
 
         $this->postJson('/api/import/preview', [
-            'url' => 'https://type.jp/job-1/1350132_detail/?pathway=116',
+            'url' => 'https://type.jp/job-1/0000002_detail/?pathway=116',
             'type' => 'career',
         ])
             ->assertStatus(200)

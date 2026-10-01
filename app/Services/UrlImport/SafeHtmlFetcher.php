@@ -122,9 +122,6 @@ class SafeHtmlFetcher
     }
 
     /**
-     * @param array{scheme: string, host: string, port: int, ips: list<string>} $safety
-     */
-    /**
      * 全体の締め切りまでの残り秒数。使い切っていればタイムアウトとして中断する。
      */
     private function remainingSeconds(float $deadline): int

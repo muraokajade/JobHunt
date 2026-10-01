@@ -94,7 +94,7 @@ describe('ProjectDetailPanel 表示項目', () => {
     type: 'career',
     name: '案件',
     description: '一行目\n\n三行目',
-    project_url: 'https://type.jp/job-1/1350132_detail/?pathway=116',
+    project_url: 'https://type.jp/job-1/0000002_detail/?pathway=116',
     reward_text: '5000000 JPY (YEAR)',
     media: 'type',
     client_name: '株式会社サンプル',
@@ -264,7 +264,7 @@ describe('ProjectDetailPanel 報酬・媒体の表示', () => {
   it('既存type.jp案件(媒体=その他)はURLから判定してtypeと出す', () => {
     render(
       <ProjectDetailPanel
-        project={makeProject({ media: 'その他', project_url: 'https://type.jp/job-1/1344057_detail/' })}
+        project={makeProject({ media: 'その他', project_url: 'https://type.jp/job-1/0000001_detail/' })}
         variant="active"
         onClose={() => {}}
       />
@@ -276,7 +276,7 @@ describe('ProjectDetailPanel 報酬・媒体の表示', () => {
   it('利用者が選んだ媒体はURLで上書きしない', () => {
     render(
       <ProjectDetailPanel
-        project={makeProject({ media: 'Green', project_url: 'https://type.jp/job-1/1344057_detail/' })}
+        project={makeProject({ media: 'Green', project_url: 'https://type.jp/job-1/0000001_detail/' })}
         variant="active"
         onClose={() => {}}
       />

@@ -686,7 +686,7 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
             ['Content-Type' => 'text/html']
         )]);
 
-        $this->postJson('/api/import/preview', ['url' => 'https://type.jp/job-1/1344057_detail/'])
+        $this->postJson('/api/import/preview', ['url' => 'https://type.jp/job-1/0000001_detail/'])
             ->assertStatus(200)
             ->assertJsonPath('data.name', '公開求人タイトル');
     }
@@ -706,19 +706,19 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
             . '----------------■応募資格----------------'
             . '■学歴不問 ■業務未経験OK（プログラミング経験必須）'
             . '=====■想定給与====='
-            . '★想定年収500万〜1221万円 ■正社員月給41.7万〜101.7万円'
+            . '★想定年収450万〜1050万円 ■正社員月給37.5万〜87.5万円'
             . '※給与は経験・スキルを考慮の上、決定します。'
             . ' END';
 
         $html = '<html><head>'
-            . '<meta property="og:title" content="■開発エンジニア／フルリモート＆地方在住可">'
+            . '<meta property="og:title" content="■Webアプリ開発エンジニア／フルリモート可">'
             . '<meta property="og:site_name" content="転職type - マッチする求人情報が分かる、探せる、転職サイト">'
             . '<script type="application/ld+json">'
             . json_encode([
                 '@type' => 'JobPosting',
-                'title' => '■開発エンジニア／フルリモート＆地方在住可',
+                'title' => '■Webアプリ開発エンジニア／フルリモート可',
                 'description' => $description,
-                'hiringOrganization' => ['name' => '株式会社リリー技研'],
+                'hiringOrganization' => ['name' => '架空システム株式会社'],
             ], JSON_UNESCAPED_UNICODE)
             . '</script></head></html>';
 
@@ -730,12 +730,12 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
         $this->fakeTypeJobPage();
 
         $name = $this->postJson('/api/import/preview', [
-            'url' => 'https://type.jp/job-1/1344057_detail/',
+            'url' => 'https://type.jp/job-1/0000001_detail/',
             'type' => 'career',
         ])->assertStatus(200)->json('data.name');
 
         $this->assertStringNotContainsString('■', $name);
-        $this->assertSame('開発エンジニア／フルリモート＆地方在住可', $name);
+        $this->assertSame('Webアプリ開発エンジニア／フルリモート可', $name);
     }
 
     public function test_type_job_description_has_no_decoration_or_extraction_noise(): void
@@ -743,7 +743,7 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
         $this->fakeTypeJobPage();
 
         $description = $this->postJson('/api/import/preview', [
-            'url' => 'https://type.jp/job-1/1344057_detail/',
+            'url' => 'https://type.jp/job-1/0000001_detail/',
         ])->assertStatus(200)->json('data.description');
 
         $this->assertNotNull($description);
@@ -761,7 +761,7 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
         $this->fakeTypeJobPage();
 
         $description = $this->postJson('/api/import/preview', [
-            'url' => 'https://type.jp/job-1/1344057_detail/',
+            'url' => 'https://type.jp/job-1/0000001_detail/',
         ])->assertStatus(200)->json('data.description');
 
         // 金額・注記など有効な本文は削らない(抜粋長の範囲内で確認する)。
@@ -774,7 +774,7 @@ class UrlImportPreviewApiTest extends AuthenticatedApiTestCase
         $this->fakeTypeJobPage();
 
         $media = $this->postJson('/api/import/preview', [
-            'url' => 'https://type.jp/job-1/1344057_detail/',
+            'url' => 'https://type.jp/job-1/0000001_detail/',
         ])->assertStatus(200)->json('data.media');
 
         // 媒体プルダウンの選択肢に無い og:site_name をそのまま入れると未選択に見えるため、

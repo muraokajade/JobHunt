@@ -54,24 +54,24 @@ class TextNormalizerTest extends TestCase
     public function test_amounts_are_preserved(): void
     {
         $this->assertSame(
-            '想定年収500万〜1221万円 月給41.7万〜101.7万円',
-            TextNormalizer::normalize('■想定年収500万〜1221万円 月給41.7万〜101.7万円')
+            '想定年収450万〜1050万円 月給37.5万〜87.5万円',
+            TextNormalizer::normalize('■想定年収450万〜1050万円 月給37.5万〜87.5万円')
         );
     }
 
     public function test_company_and_conditions_are_preserved(): void
     {
         $this->assertSame(
-            '株式会社リリー技研 正社員/契約社員 年間休日145日',
-            TextNormalizer::normalize('■株式会社リリー技研 ■正社員/契約社員 ■年間休日145日')
+            '架空システム株式会社 正社員/契約社員 年間休日145日',
+            TextNormalizer::normalize('■架空システム株式会社 ■正社員/契約社員 ■年間休日145日')
         );
     }
 
     public function test_urls_are_preserved(): void
     {
         $this->assertSame(
-            'https://type.jp/job-1/1344057_detail/?page=2',
-            TextNormalizer::normalize('https://type.jp/job-1/1344057_detail/?page=2')
+            'https://type.jp/job-1/0000001_detail/?page=2',
+            TextNormalizer::normalize('https://type.jp/job-1/0000001_detail/?page=2')
         );
     }
 

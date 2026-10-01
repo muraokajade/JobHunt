@@ -14,9 +14,6 @@ import { employmentTypeDisplay } from '../utils/employmentType';
  *   PC   : 右から出るパネル(一覧はそのまま見えている。次の案件へ乗り換えても位置が動かない)
  *   スマホ: 下から出るシート(横幅が足りないので右パネルにはしない)
  * として出す。
- *
- * 出している情報は、これまで一覧の展開部にあったものと同じ。
- * 新しい項目は足していないし、APIも保存データも変えていない。
  */
 
 interface ProjectDetailPanelProps {

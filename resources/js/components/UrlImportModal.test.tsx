@@ -278,7 +278,7 @@ describe('UrlImportModal', () => {
     render(<UrlImportModal open onClose={() => {}} onPreviewReady={() => {}} onManualEntry={() => {}} />);
 
     fireEvent.change(screen.getByPlaceholderText('https://...'), {
-      target: { value: 'https://type.jp/job-1/1344057_detail/' },
+      target: { value: 'https://type.jp/job-1/0000001_detail/' },
     });
 
     expect(screen.getByRole('button', { name: '求人情報を読み込む' })).toBeInTheDocument();
@@ -321,7 +321,7 @@ describe('UrlImportModal', () => {
     const onManualEntry = vi.fn();
     render(<UrlImportModal open onClose={() => {}} onPreviewReady={() => {}} onManualEntry={onManualEntry} />);
 
-    fillUrlAndSubmit('https://type.jp/job-1/1350132_detail/?pathway=116');
+    fillUrlAndSubmit('https://type.jp/job-1/0000002_detail/?pathway=116');
 
     await waitFor(() =>
       expect(
@@ -336,7 +336,7 @@ describe('UrlImportModal', () => {
 
     // URLは保持され、そのまま手入力へ進める。
     fireEvent.click(screen.getByRole('button', { name: '手入力で続ける' }));
-    expect(onManualEntry).toHaveBeenCalledWith('https://type.jp/job-1/1350132_detail/?pathway=116', 'side_job');
+    expect(onManualEntry).toHaveBeenCalledWith('https://type.jp/job-1/0000002_detail/?pathway=116', 'side_job');
   });
 
   it('AbortErrorでも同じ案内を出す', async () => {

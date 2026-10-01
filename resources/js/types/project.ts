@@ -54,15 +54,6 @@ export interface ApiValidationErrors {
   errors: Record<string, string[]>;
 }
 
-/**
- * error_code形式のエラー(URL取込のSSRF/取得失敗等)。
- * ApiValidationErrorsとは異なり`errors`(フィールド別)を持たず、`message`をそのまま利用者へ表示する。
- */
-export interface ApiErrorCodeResponse {
-  message: string;
-  error_code: string;
-}
-
 export interface ProjectFormData {
   /** 新規登録時は未選択('')から始まる。保存前に転職/副業を明示的に選ばせる。 */
   type: ProjectType | '';

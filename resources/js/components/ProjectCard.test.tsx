@@ -88,7 +88,7 @@ describe('ProjectCard 一覧行が出す情報', () => {
           applied_date: '2026-08-01',
           next_action: '面談日程を調整',
           memo: 'メモ本文',
-          project_url: 'https://type.jp/job-1/1350132_detail/',
+          project_url: 'https://type.jp/job-1/0000002_detail/',
           job_type: 'Webバックエンド',
           location: '東京',
           employment_type: 'FULL_TIME',
@@ -98,7 +98,7 @@ describe('ProjectCard 一覧行が出す情報', () => {
     );
 
     for (const text of ['Web開発', '2026-08-01', '面談日程を調整', 'メモ本文',
-                        'https://type.jp/job-1/1350132_detail/', 'Webバックエンド', '東京', '正社員']) {
+                        'https://type.jp/job-1/0000002_detail/', 'Webバックエンド', '東京', '正社員']) {
       expect(container.textContent).not.toContain(text);
     }
   });

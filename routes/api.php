@@ -10,10 +10,6 @@ use App\Http\Controllers\ProjectTrashController;
  * 認証はセッション(webガード)で行うため、APIルートにも`web`ミドルウェアグループを適用する
  * (セッション開始・CSRF検証)。SPAは同一オリジンのwelcome.blade.phpから配信されるため、
  * セッションCookieとCSRFトークンをそのまま利用できる。
- *
- * ミドルウェアをbootstrap/app.phpではなくここで宣言しているのは、
- * bootstrap/app.phpに未コミットのBasic認証(EnsureCrmAccess)設定が含まれており、
- * 本作業でそれを巻き込まないようにするため。
  */
 
 Route::middleware('web')->group(function () {

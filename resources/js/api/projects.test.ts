@@ -61,7 +61,7 @@ describe('apiFetch のタイムアウト', () => {
   it('URL取込は上限つきで呼び出される', () => {
     fetchMock.mockImplementation(() => new Promise<Response>(() => {}));
 
-    previewImportUrl('https://type.jp/job-1/1350132_detail/?pathway=116', 'career');
+    previewImportUrl('https://type.jp/job-1/0000002_detail/?pathway=116', 'career');
 
     const [url, options] = fetchMock.mock.calls[0];
     expect(String(url)).toBe('/api/import/preview');

@@ -41,14 +41,6 @@ export function mediaFromUrl(url: string | null | undefined): string | null {
   return null;
 }
 
-/** 媒体プルダウンの選択肢に含まれ、かつ受け皿の「その他」ではない値か。 */
-export function isSpecificMedia(media: string | null | undefined): boolean {
-  if (!media) return false;
-  if (media === FALLBACK_MEDIA) return false;
-
-  return (MEDIA_OPTIONS as readonly string[]).includes(media);
-}
-
 /**
  * 画面(一覧・詳細)で使う媒体。DBの値は書き換えず、表示のときだけURL判定を反映する。
  *
