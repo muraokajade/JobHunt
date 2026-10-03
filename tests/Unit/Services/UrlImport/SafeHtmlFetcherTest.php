@@ -115,9 +115,22 @@ class SafeHtmlFetcherTest extends TestCase
     }
 
     /**
+     * 上と同じ入力(期待URLを除いた「入力URL・偽DNS」の組)。固定先との一致はすべての入力で確かめる。
+     *
+     * @return array<string, array{string, array<string, list<string>>}>
+     */
+    public static function inputsWhoseHostnameIsNormalizedBeforeSending(): array
+    {
+        return array_map(
+            static fn (array $case): array => [$case[0], $case[1]],
+            self::urlsWhoseHostnameIsNormalizedBeforeSending()
+        );
+    }
+
+    /**
      * @param array<string, list<string>> $dnsMap
      */
-    #[DataProvider('urlsWhoseHostnameIsNormalizedBeforeSending')]
+    #[DataProvider('inputsWhoseHostnameIsNormalizedBeforeSending')]
     public function test_request_url_hostname_matches_the_pinned_hostname(string $input, array $dnsMap): void
     {
         $fetcher = $this->fetcher();
