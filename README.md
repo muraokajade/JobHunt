@@ -1,13 +1,11 @@
 # JobHunt
 
-[![CI](https://github.com/muraokajade/side-project-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/muraokajade/side-project-crm/actions/workflows/ci.yml)
+[![CI](https://github.com/muraokajade/JobHunt/actions/workflows/ci.yml/badge.svg)](https://github.com/muraokajade/JobHunt/actions/workflows/ci.yml)
 
 転職と副業の求人・案件を1か所に登録し、応募後の選考状況まで管理する個人向けWebアプリです。
 
 求人ページのURLを貼ると、サーバー側でページを取得して案件名・報酬・締切などを読み取り、登録フォームの下書きを作ります。
 自分自身の転職活動で使いながら、実際に困ったことをもとに改善を続けています。
-
-> リポジトリ名の `side-project-crm` は、副業案件の管理として作り始めた初期の名残です。
 
 ## 解決する課題
 
