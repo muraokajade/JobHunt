@@ -1,68 +1,141 @@
-# 副業案件管理（side-project-crm）
+# JobHunt
 
-CrowdWorks・MENTA・Lancers等のフリーランス案件を一元管理するための個人向けWebアプリケーション（Phase 1）。
+[![CI](https://github.com/muraokajade/side-project-crm/actions/workflows/ci.yml/badge.svg)](https://github.com/muraokajade/side-project-crm/actions/workflows/ci.yml)
 
-詳細な要件・設計は [`.kiro/specs/side-project-manager/`](.kiro/specs/side-project-manager/)（`requirements.md` / `design.md` / `tasks.md`）を参照してください。本READMEはセットアップ・実行・検証手順のみを扱います。
+転職と副業の求人・案件を1か所に登録し、応募後の選考状況まで管理する個人向けWebアプリです。
 
-## アプリの概要
+求人ページのURLを貼ると、サーバー側でページを取得して案件名・報酬・締切などを読み取り、登録フォームの下書きを作ります。
+自分自身の転職活動で使いながら、実際に困ったことをもとに改善を続けています。
 
-副業として受けているフリーランス案件（応募状況・報酬・次アクション等）を、案件ごとに登録・一覧・検索・絞り込みできるツールです。単一ユーザーが自分のPC上で使うことを前提としています。
+> リポジトリ名の `side-project-crm` は、副業案件の管理として作り始めた初期の名残です。
 
-## 想定ユーザー
+## 解決する課題
 
-- 複数のクラウドソーシングサービス（CrowdWorks・MENTA・Lancers等）で副業案件を並行して探している/受けているフリーランサー本人。
-- 認証機能を持たないため、**本人がローカル環境で単独利用する**ことを前提とします（詳細は「外部公開しないことに関する注意」を参照）。
+| 問題 | JobHuntでの扱い |
+|---|---|
+| 求人が複数の媒体に散らばり、後から探し直すことになる | URL取込または手入力で1つの一覧に集める。URLから媒体を判定する |
+| 求人情報を手で書き写すのが面倒 | 求人ページの構造化データ(JSON-LD)やOGPから項目を読み取り、確認・修正できる下書きにする |
+| 応募後、どの企業がどの段階にいるか追えない | 転職・副業それぞれのステータスで管理し、一覧を「選考が進んでいる順」に並べる |
+| 企業から後で届いた情報が残らない | 案件ごとの「活動メモ」に書き足していく |
 
 ## 主な機能
 
-- 案件の登録・編集・削除（モーダルフォーム、全17項目）
-- 案件一覧のテーブル表示（登録日時降順）
-- 案件名・メモによるキーワード検索
-- ステータス・媒体による絞り込み（AND条件）
-- サマリーカード（案件総数／面談予定／返信待ち／契約済み／完了の件数）
-- 次に対応すべき案件の一覧（次アクション予定日の昇順、期限切れは強調表示）
-- ステータスの色分けバッジ表示
-- APIバリデーションエラー（422）のフィールド別表示、通信エラー時の汎用エラー表示
-- 送信中の多重送信防止・ローディング表示
+- **URL取込**: 求人URLからページを取得・解析し、登録フォームの下書きを作る(保存は確認してから)。同じURLの登録済み案件があれば警告する。ログインが必要なページは、URLを引き継いで手入力へ案内する
+- **手入力**: 同じ登録フォームで全項目を入力する。新規登録のステータスは「応募済み」から始まる
+- **転職 / 副業の管理**: 種別ごとにステータスの体系(転職8段階・副業12段階)と専用項目が異なる
+- **ステータス管理**: 詳細画面から直接変更できる。変更は履歴としてDBに記録される
+- **検索・並び順**: 「すべて / 転職 / 副業」の切り替えとキーワード検索。一覧は選考の進み具合 → 更新日時の順に並ぶ
+- **詳細・編集**: 詳細はPCでは右パネル、スマートフォンでは下からのシートで表示する。登録と同じフォームで後から編集できる
+- **活動メモ**: 案件ごとの自由記述欄を、詳細画面から追加・編集する
+- **ゴミ箱**: 削除した案件の一覧・復元・完全削除
+- **認証**: ユーザー登録・ログイン。案件はユーザーごとに分離される
+- **その他**: お気に入り、次アクション(予定日)、案件0件のときの案内、架空案件で試せるデモ(閲覧専用)、スマートフォン対応
+
+詳細: [docs/01-overview.md](docs/01-overview.md)
+
+## 画面
+
+| 1. 求人URLから登録 | 2. URL取得結果を確認して登録 |
+|---|---|
+| <img src="docs/images/url-import.png" alt="URLから登録の画面。求人ページのURLと種別を入力する" width="360"> | <img src="docs/images/url-import-result.png" alt="URLから取得した内容が入った登録フォーム" width="320"> |
+| 求人ページのURLと種別を入力すると、サーバー側でページを読み取ります。 | 読み取った内容が登録フォームに入ります。取得できなかった項目は案内が出るので、確認・修正してから登録します。 |
 
 ## 技術スタック
 
-`composer.json` / `composer.lock` / `package.json` / `package-lock.json` および実行環境から確認した実際のバージョンです（`^`等の許容範囲を含む要求バージョンは `composer.json` / `package.json` の記載どおり）。
+| 区分 | 技術 |
+|---|---|
+| Frontend | React 19 / TypeScript 7 / Vite 8 / Tailwind CSS 4 |
+| Backend | Laravel 13(PHP 8.4) |
+| Database | 本番: PostgreSQL(Neon) / ローカル・テスト: SQLite |
+| Authentication | Laravelのセッション認証(Cookie + CSRFトークン)。サイト全体のBasic認証の仕組み(設定時のみ有効) |
+| Test | Vitest 4 + Testing Library / PHPUnit 12 |
+| Deployment | Dockerのマルチステージビルド(Node 24 → FrankenPHP / PHP 8.4)を Vercel 上で実行 |
+| CI | GitHub Actions |
 
-### バックエンド
+## Architecture
 
-| 項目 | 要求バージョン（`composer.json`） | 実際にインストール済みのバージョン |
-|---|---|---|
-| PHP | `^8.3` | 8.4.21 |
-| Laravel Framework | `^13.8` | v13.24.0 |
-| PHPUnit | `^12.5.12` | 12.5.33 |
-| データベース | — | SQLite |
+```mermaid
+flowchart LR
+    Browser["ブラウザ<br>React SPA"] --> App["Laravel 13<br>SPAのHTML + JSON API<br>セッション認証"]
+    App --> DB[("PostgreSQL<br>Neon")]
+    App -->|"SSRF対策付きで取得"| Sites["外部の求人ページ"]
+```
 
-### フロントエンド
+LaravelがSPAのHTMLとJSON APIを同じオリジンから返す構成で、本番では1つのDockerイメージとして動きます。
+詳細: [docs/02-architecture.md](docs/02-architecture.md)
 
-| 項目 | 要求バージョン（`package.json`） | 実際にインストール済みのバージョン |
-|---|---|---|
-| Node.js | 未指定（`package.json`に`engines`記載なし） | v24.14.1（本ドキュメント作成時の動作確認環境） |
-| React / React DOM | `^19.2.8` | 19.2.8 |
-| TypeScript | `^7.0.2` | 7.0.2 |
-| Vite | `^8.0.0` | 8.2.1 |
-| @vitejs/plugin-react | `^6.0.5` | 6.0.5 |
-| laravel-vite-plugin | `^3.1` | 3.2.0 |
-| Tailwind CSS | `^4.0.0` | 4.3.3 |
-| Vitest | `^4.1.11` | 4.1.11（Node要件: `^20.0.0 \|\| ^22.0.0 \|\| >=24.0.0`） |
-| @testing-library/react | `^16.3.2` | 16.3.2 |
-| @testing-library/jest-dom | `^7.0.1` | 7.0.1 |
-| jsdom | `^29.1.1`（npmが解決したバージョン） | 29.1.1 |
+## 技術的な見どころ
 
-## 必要環境
+**URL取込のSSRF対策**
 
-- PHP 8.3以上（実績: 8.4.21）
-- Composer
-- Node.js（Vitestの要件: `^20.0.0 || ^22.0.0 || >=24.0.0`。本ドキュメントはv24.14.1で動作確認）
-- npm（実績: 11.11.0）
-- 追加のデータベースサーバーは不要（SQLite）
+URL取込では、利用者が入力したURLへサーバーが接続します。内部ネットワークやクラウドのメタデータへの踏み台にされないよう、URLの文字列ではなく「最終的に接続するIP」を基準に判定しています。
 
-## 初回セットアップ
+- DNSで解決した**すべての**IPを検査し、非公開・ループバック・リンクローカル・予約済みの範囲が1つでもあれば拒否する
+- 検証したIPに接続先を固定し(cURLの `CURLOPT_RESOLVE`)、検証後にDNSの答えを切り替える攻撃(DNS rebinding)を防ぐ
+- 自動リダイレクトは使わず、リダイレクト先ごとに最初から検証し直す
+- 見直しの中で、末尾ドット付きのホスト名(`example.com.`)だと接続先の固定が外れることを見つけ、送信URLを検証済みのホスト名で組み立て直し、送信直前に一致を確かめるように修正した
+- cURLが別の意味に解釈する表記(`2130706433`・`127.1` などの数値表記、IPv4互換IPv6)や、Unicode / 全角のホスト名も扱っている
+
+詳細: [docs/05-url-import-security.md](docs/05-url-import-security.md)
+
+**テストとCI**
+
+外部のDB・DNS・サイトに依存しないテストを、ローカルとGitHub Actionsで同じコマンドで実行しています。詳細は次の章を参照してください。
+
+## Test / Quality
+
+| 対象 | 内容 |
+|---|---|
+| Frontend | Vitest 289件。画面全体の流れ(登録・ステータス変更・活動メモ・並び順・デモ)、フォーム、一覧、詳細表示、URL取込の画面を、利用者に見える要素で操作して確認する |
+| Backend | PHPUnit 413件。SSRF対策(167件)、求人ページの解析、ユーザー間のデータ分離(他人の案件は404)、APIの入力検証、ゴミ箱、ステータス履歴、認証、migrationを確認する |
+| 型 | `tsc --noEmit` |
+| ビルド | `npm run build`(本番と同じViteのビルド) |
+| CI | mainへのpush / pull requestで、上記をすべて実行する。DBはメモリ上のSQLiteで、GitHub Secretsは使わない |
+
+件数は2026年10月時点です。テストが守っているものと限界(実ブラウザでのE2Eテストは無い、など)は [docs/06-testing.md](docs/06-testing.md) にまとめています。
+
+## 実運用からの改善
+
+自分の転職活動で使う中で見つかった問題を、次のように直してきました。
+
+- 一覧の情報が多すぎて状況をつかみにくかった → 比較に必要な項目だけの1行表示にし、詳細を別パネルに分けた
+- ステータスを1つ変えるのに編集フォームが必要だった → 詳細画面から直接変更できるようにした
+- 登録するのはほとんど応募済みの求人なのに、初期ステータスが「気になる」だった → 「応募済み」に変更した
+- 登録順の一覧では、選考が進んでいる案件が埋もれた → 選考の進み具合 → 更新日時の順に並べるようにした
+- 企業から後で届いた情報を残す場所がなかった → 案件ごとの活動メモを追加した
+
+一覧と経緯: [docs/01-overview.md](docs/01-overview.md)(7章)、[docs/08-decisions-and-improvements.md](docs/08-decisions-and-improvements.md)
+
+## AIの活用
+
+開発では、Claude や ChatGPT などのAIを使っています(一部のcommitには `Co-Authored-By` としてAIを記録しています)。
+使い方は、AIに作業を任せきりにするのではなく、次の流れにしています。
+
+1. **AIで調べる・選択肢を広げる**: 既存コードの調査、変更の影響範囲の確認、実装案やテスト観点の洗い出し、差分のレビュー
+2. **自分で決める**: 仕様・方針・優先順位と、どの案を採るかを判断する
+3. **結果をレビューする**: AIが出した実装や報告を、差分とコードで確認する
+4. **検証する**: テスト、GitHub Actions、実際の画面で確かめてから取り込む
+
+検証で見つかった例として、作業時のテスト結果の要約では「全件通過」でも、GitHub Actionsでは警告による失敗が見つかったことがあります。以後は、要約ではなく終了コードで判定しています([docs/06-testing.md](docs/06-testing.md))。
+
+## Technical Documentation
+
+| ドキュメント | 内容 |
+|---|---|
+| [01-overview.md](docs/01-overview.md) | JobHuntとは何か、背景、機能、実運用からの改善 |
+| [02-architecture.md](docs/02-architecture.md) | 全体構成、主要な処理の流れ、認証・セッション・CSRF |
+| [03-database.md](docs/03-database.md) | ER図、テーブル、論理削除、ステータス履歴、ユーザー分離 |
+| [04-api.md](docs/04-api.md) | APIの一覧、リクエスト / レスポンス、エラーの形 |
+| [05-url-import-security.md](docs/05-url-import-security.md) | URL取込のSSRF対策、見直しで見つけて直した問題 |
+| [06-testing.md](docs/06-testing.md) | テストの方針、内容、実行方法、限界 |
+| [07-deployment.md](docs/07-deployment.md) | Dockerイメージ、本番の設定、デプロイ前の確認 |
+| [08-decisions-and-improvements.md](docs/08-decisions-and-improvements.md) | 主な設計判断、改善の経緯、今後の候補 |
+
+UIの方針は [docs/ui-guidelines.md](docs/ui-guidelines.md) にあります。
+
+## Local Setup
+
+**必要なもの**: PHP 8.4以上(`composer.lock` の依存が8.4.1以上を要求)、Composer 2、Node.js 24(CI・Dockerと同じ)。PHP拡張は `pdo_sqlite`・`curl`・`mbstring`・`dom` などを使います。DBサーバーは不要です(SQLite)。
 
 ```bash
 composer install
@@ -72,88 +145,28 @@ touch database/database.sqlite
 php artisan migrate
 npm ci
 npm run build
-```
-
-通常の環境構築（新しくcloneした直後、または他の変更を加えていない状態からの構築）では、package-lock.jsonの内容をそのまま再現するnpm ciを使用してください。依存パッケージを追加・更新する場合のみnpm installを使用し、更新後のpackage-lock.jsonをコミットしてください。
-
-`.env`の`DB_CONNECTION=sqlite`はそのままで動作します（`DB_DATABASE`は未設定でよく、Laravelが`database/database.sqlite`をデフォルトとして使用します。`config/database.php`のsqlite接続設定で確認済み）。
-
-`composer.json`にはこれらをまとめた `composer run setup` スクリプトも定義されていますが、`npm install --ignore-scripts` を実行するため、npm部分は上記手順（npm ci）と内容が異なります。
-
-## 起動方法
-
-### 開発モード（フロントエンドのホットリロードあり）
-
-```bash
-composer run dev
-```
-
-`php artisan serve`・キューワーカー・ログ表示（`pail`）・`npm run dev`（Vite開発サーバー）を`concurrently`で同時起動します（`composer.json`の`dev`スクリプトに定義済み）。個別に起動する場合は以下の2つを別ターミナルで実行してください。
-
-```bash
-php artisan serve
-npm run dev
-```
-
-### ビルド済みアセットを配信するモード
-
-```bash
-npm run build
 php artisan serve
 ```
 
-`http://127.0.0.1:8000/` でアクセスできます。**本ドキュメントの動作確認は、このビルド済みアセット配信モードで実施しています**（`composer run dev` / `npm run dev` によるホットリロードモード自体は本ドキュメント作成時に個別実行での確認は行っていません）。
+`http://127.0.0.1:8000/` を開き、画面からユーザー登録して使います。
+ローカルでは `.env` の `APP_ACCESS_PASSWORD` が空なので、Basic認証は無効です。
+開発中は `npm run build` の代わりに、別のターミナルで `npm run dev`(Viteの開発サーバー)を起動できます。
 
-## フロントエンドテスト
-
-```bash
-npm run test
-```
-
-`vitest run` を実行します（`resources/js/**/*.test.{ts,tsx}`）。本ドキュメント作成時点で **2ファイル・15件が全件PASS** することを確認済みです。
-
-## バックエンドテスト
+**テストとチェック**
 
 ```bash
-php artisan test
+npm run test          # Frontend(Vitest)
+npx tsc --noEmit      # 型チェック
+npm run build         # 本番ビルド
+php artisan test      # Backend(PHPUnit。メモリ上のSQLiteで動き、database.sqliteには影響しない)
 ```
 
-本ドキュメント作成時点で **11 tests / 40 assertions が全件PASS** することを確認済みです。テストは`phpunit.xml`で`DB_DATABASE=:memory:`に固定されており、`database/database.sqlite`（実データ）には影響しません。
+## 今後の改善候補
 
-## 型チェック
+- `project_url` の列の長さ(255文字)と入力検証(2048文字)の不一致の解消
+- URL取込APIへの回数制限
+- 本番DBへのmigrationの実行手順の整備
+- 応募後の管理の拡張(次アクションの時刻、日付付きの活動履歴)
+- 静的解析のCIへの追加と、実ブラウザでのE2Eテスト
 
-```bash
-npx tsc --noEmit
-```
-
-`package.json`にスクリプトとしては定義していないため`npx`経由で直接実行します。本ドキュメント作成時点でエラー0件を確認済みです。
-
-## ビルド
-
-```bash
-npm run build
-```
-
-`vite build`を実行し、`public/build/`にアセットを出力します（`.gitignore`で`/public/build`は除外済み）。
-
-## データベース設定
-
-- 接続: SQLite（`.env`の`DB_CONNECTION=sqlite`）
-- ファイル: `database/database.sqlite`（`.gitignore`により`database/.gitignore`の`*.sqlite*`パターンでGit管理対象外）
-- マイグレーション: `database/migrations/`配下の4ファイル（`users`・`password_reset_tokens`・`sessions`・`cache`・`cache_locks`・`jobs`・`job_batches`・`failed_jobs`はLaravel標準の初期マイグレーション3ファイルに含まれます。案件データ用の`projects`テーブルは`2026_08_10_234223_create_projects_table.php`で作成）
-- `SESSION_DRIVER` / `CACHE_STORE` / `QUEUE_CONNECTION` はいずれも`.env.example`で`database`に設定されており、上記マイグレーションで作成されるテーブルのみで動作します（Redis・外部キューサーバー等は不要）
-
-## 既知の制約
-
-- Phase 1のスコープ外（詳細は「現在のPhase 1スコープ」および[`.kiro/specs/side-project-manager/requirements.md`](.kiro/specs/side-project-manager/requirements.md)を参照）。
-- APIエンドポイントにレート制限は設定されていません。
-- フロントエンドの一覧テーブルはモバイル幅では横スクロール表示になります（カード型レイアウトへの変更は未実施）。
-- `.env.example`にはLaravel標準スキャフォールドのRedis／AWS／メール送信関連の項目が残っていますが、本アプリでは未使用です（`SESSION_DRIVER`等はいずれも`database`）。
-
-## 外部公開しないことに関する注意
-
-**本アプリケーションは認証機能を持たないため、インターネットや共有ネットワークへの公開を前提としていません。** 起動すると誰でも案件データの閲覧・登録・編集・削除ができる状態になります。`localhost`（自分のPC内）でのみ利用してください。将来的に外部公開・複数ユーザー対応を行う場合は、認証機能の追加を別フェーズとして検討する必要があります（現時点では未着手・未計画です）。
-
-## 現在のPhase 1スコープ
-
-要件定義書（[`requirements.md`](.kiro/specs/side-project-manager/requirements.md)）が定めるPhase 1の対象外機能（認証・通知・メール連携・CSV/Excelエクスポート・複雑な権限管理・マルチユーザー対応等）は未実装です。Phase 1の実装状況の詳細な内訳は[`tasks.md`](.kiro/specs/side-project-manager/tasks.md)を参照してください。
+その他の候補と判断の経緯は [docs/08-decisions-and-improvements.md](docs/08-decisions-and-improvements.md) にあります。
