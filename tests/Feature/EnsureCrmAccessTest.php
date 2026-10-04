@@ -11,6 +11,8 @@ use Tests\TestCase;
  * 設定値はconfig('access.*')から読む必要がある。ミドルウェアが直接env()を読むと
  * config:cache 実行後にnullが返り、Basic認証が無言で無効化される
  * (=誰でも到達できてしまう)ため、その退行をここで検出する。
+ *
+ * 保護対象の代表としてアプリ本体(/app)を使う。公開LP(/)が対象外であることは LandingPageTest で確認する。
  */
 class EnsureCrmAccessTest extends TestCase
 {
@@ -22,7 +24,7 @@ class EnsureCrmAccessTest extends TestCase
     {
         config(['access.password' => '']);
 
-        $this->get('/')->assertStatus(200);
+        $this->get('/app')->assertStatus(200);
     }
 
     // ---- 有効時 -----------------------------------------------------------
@@ -31,7 +33,7 @@ class EnsureCrmAccessTest extends TestCase
     {
         config(['access.user' => 'monitor', 'access.password' => 'beta-secret']);
 
-        $response = $this->get('/');
+        $response = $this->get('/app');
 
         $response->assertStatus(401);
         $response->assertHeader('WWW-Authenticate', 'Basic realm="Side Project CRM", charset="UTF-8"');
@@ -42,7 +44,7 @@ class EnsureCrmAccessTest extends TestCase
         config(['access.user' => 'monitor', 'access.password' => 'beta-secret']);
 
         $this->withBasicAuth('monitor', 'wrong-password')
-            ->get('/')
+            ->get('/app')
             ->assertStatus(401);
     }
 
@@ -51,7 +53,7 @@ class EnsureCrmAccessTest extends TestCase
         config(['access.user' => 'monitor', 'access.password' => 'beta-secret']);
 
         $this->withBasicAuth('someone-else', 'beta-secret')
-            ->get('/')
+            ->get('/app')
             ->assertStatus(401);
     }
 
@@ -60,7 +62,7 @@ class EnsureCrmAccessTest extends TestCase
         config(['access.user' => 'monitor', 'access.password' => 'beta-secret']);
 
         $this->withBasicAuth('monitor', 'beta-secret')
-            ->get('/')
+            ->get('/app')
             ->assertStatus(200);
     }
 
@@ -92,10 +94,10 @@ class EnsureCrmAccessTest extends TestCase
         putenv('APP_ACCESS_PASSWORD');
 
         try {
-            $this->get('/')->assertStatus(401);
+            $this->get('/app')->assertStatus(401);
 
             $this->withBasicAuth('monitor', 'beta-secret')
-                ->get('/')
+                ->get('/app')
                 ->assertStatus(200);
         } finally {
             if ($originalUser !== null) {
