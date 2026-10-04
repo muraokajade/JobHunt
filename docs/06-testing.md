@@ -14,7 +14,7 @@ JobHuntのテストが何を守っているか、どう実行するか、どこ�
 | 対象 | フレームワーク | 件数 | 実行環境 |
 |---|---|---|---|
 | Frontend | Vitest 4 + Testing Library(React) | 289件 / 16ファイル | jsdom(ブラウザを模したNode.js上の環境) |
-| Backend | PHPUnit 12 | 413件(Feature 221件 / Unit 192件) | Laravelのテスト環境 + メモリ上のSQLite |
+| Backend | PHPUnit 12 | 420件(Feature 228件 / Unit 192件) | Laravelのテスト環境 + メモリ上のSQLite |
 | 型 | TypeScript(`tsc --noEmit`) | — | — |
 | ビルド | Vite(`npm run build`) | — | — |
 
@@ -30,7 +30,7 @@ php artisan test      # Backend(PHPUnit)
 ```
 
 - Backendのテスト設定は `phpunit.xml` にあり、`DB_CONNECTION=sqlite`・`DB_DATABASE=:memory:` で動きます。`.env` のDB設定や本番のDBは使いません。
-- 一部のテスト(SPAのHTMLを返す `/`)は、ビルド済みのフロントエンド(`public/build/manifest.json`)を読み込みます。クリーンな環境では、先に `npm run build` が必要です。
+- 一部のテスト(SPAのHTMLを返す `/app`)は、ビルド済みのフロントエンド(`public/build/manifest.json`)を読み込みます。クリーンな環境では、先に `npm run build` が必要です。
 - 判定は、出力の要約ではなく**終了コード**で行います。PHPUnitは警告があると、テストがすべて通っていても終了コードが1になります(CIでの失敗はこれで分かります)。
 
 ## 4. Backend(PHPUnit)
@@ -56,7 +56,7 @@ php artisan test      # Backend(PHPUnit)
 | ステータス履歴 | `ProjectStatusHistoryTest` | 17 | 作成・変更時の記録、同じ値では記録しない、Eloquentを経由しない更新は記録されないこと |
 | 認証・アクセス制御 | `AuthApiTest`、`EnsureCrmAccessTest` | 22 | 登録・ログイン・ログアウト、失敗時の文言、Basic認証が `config:cache` 後も無効にならないこと |
 | スキーマ・migration | `ProjectSchemaMigrationTest`、`ProjectIndexSchemaTest` | 16 | 既定値、旧ステータス名のデータ移行の up / down、索引の追加と削除 |
-| その他 | `ExampleTest` | 1 | `/`(SPAのHTML)が200を返す |
+| 公開LP・その他 | `LandingPageTest`、`ExampleTest` | 8 | `/` が公開LP、`/app` がSPAのHTMLを返すこと、LP(`/` への GET・HEAD)だけBasic認証の対象外で `/app` とAPIは保護されること |
 
 URL取込のSSRF対策で何を防いでいるかは、[05-url-import-security.md](05-url-import-security.md) にまとめています。
 

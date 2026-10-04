@@ -30,7 +30,7 @@ JobHuntのJSON APIの設計と、主要なAPIを説明します。
 | 429 | `{ "message": "Too Many Attempts." }` | ログイン・登録の回数制限を超えた |
 
 `api/*` への例外は、`bootstrap/app.php` の設定によりHTMLではなくJSONで返ります。
-サイト全体のBasic認証(`APP_ACCESS_PASSWORD` を設定したときだけ有効)で拒否された場合は、APIに届く前に `401` と `WWW-Authenticate` ヘッダーが返ります。
+Basic認証(`APP_ACCESS_PASSWORD` を設定したときだけ有効。APIはすべて対象)で拒否された場合は、APIに届く前に `401` と `WWW-Authenticate` ヘッダーが返ります。
 
 ## 2. API一覧
 

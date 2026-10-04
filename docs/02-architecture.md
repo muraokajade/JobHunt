@@ -5,7 +5,7 @@ JobHunt全体の構成と、主要な処理の流れを説明します。
 
 ## 1. 全体構成
 
-JobHuntは、Laravelが1つのオリジンから「SPAのHTML」と「JSON API」の両方を返す構成です。
+JobHuntは、Laravelが1つのオリジンから「公開LP」「SPAのHTML」「JSON API」を返す構成です。
 フロントエンド(React)とバックエンド(Laravel)は同じリポジトリにあり、本番では1つのDockerイメージとして動きます。
 
 ```mermaid
@@ -14,7 +14,8 @@ flowchart LR
 
     subgraph App["Laravel 13 (PHP 8.4 / FrankenPHP)"]
         Gate["EnsureCrmAccess<br>(Basic認証・設定時のみ)"]
-        Web["GET /<br>welcome.blade.php<br>(SPAのHTML)"]
+        Lp["GET /<br>landing.blade.php<br>(公開LP)"]
+        Web["GET /app<br>welcome.blade.php<br>(SPAのHTML)"]
         Api["/api/*<br>webミドルウェア(セッション・CSRF)<br>+ auth"]
         Import["URL取込<br>app/Services/UrlImport"]
     end
@@ -23,6 +24,7 @@ flowchart LR
     Sites["外部の求人ページ"]
 
     Browser --> Gate
+    Gate -->|"GET / は認証なし"| Lp
     Gate --> Web
     Gate --> Api
     Api --> DB
@@ -30,7 +32,8 @@ flowchart LR
     Import -->|"SSRF対策付きでHTML取得"| Sites
 ```
 
-- 画面の切り替えはすべてReact側で行い、ルーター(URLごとのページ)は使っていません。HTMLを返すルートは `/` の1つだけです。
+- HTMLを返すルートは、公開LPの `/` とアプリ本体の `/app` の2つです。LPはBladeだけの静的なページで、ReactやAPI・DBは使いません。
+- アプリ本体の画面の切り替えはすべてReact側で行い、ルーター(URLごとのページ)は使っていません。
 - APIは `routes/api.php` で定義し、すべて `web` ミドルウェアグループ(セッション・CSRF検証)を通します。トークン方式の認証(Sanctum等)は使っていません。
 - ローカル開発とテストはSQLite、本番はPostgreSQL(Neon)です。
 
@@ -41,15 +44,15 @@ app/
   Http/Controllers/     AuthController, ProjectController, ProjectTrashController, ImportPreviewController
   Http/Requests/        入力検証(StoreProjectRequest, UpdateProjectRequest, ImportPreviewRequest, ...)
   Http/Resources/       APIの返却形式(ProjectResource)
-  Http/Middleware/      EnsureCrmAccess(サイト全体のBasic認証)
+  Http/Middleware/      EnsureCrmAccess(Basic認証。公開LPは対象外)
   Models/               Project, ProjectStatusHistory, User
   Observers/            ProjectObserver(ステータス変更の履歴を記録)
   Services/UrlImport/   URL取込(安全な取得・HTML解析・項目抽出)
   Support/              ProjectStatus(種別ごとのステータス定義), SideJobAllowed
 database/migrations/    テーブル定義とデータ移行
 routes/api.php          JSON API
-routes/web.php          SPAのHTML(GET /)
-resources/views/        welcome.blade.php(SPAの入れ物)
+routes/web.php          公開LP(GET /)とSPAのHTML(GET /app)
+resources/views/        landing.blade.php(公開LP)、welcome.blade.php(SPAの入れ物)
 resources/js/
   app.tsx               エントリポイント
   AppRoot.tsx           認証状態・一覧・絞り込み・各モーダルの状態をまとめる最上位コンポーネント
@@ -147,7 +150,7 @@ sequenceDiagram
     participant L as Laravel
     participant S as sessionsテーブル
 
-    B->>L: GET /
+    B->>L: GET /app
     L-->>B: SPAのHTML(CSRFトークンのmetaタグを含む)
     B->>L: GET /api/auth/me
     L-->>B: 401(未ログイン) または ユーザー情報
@@ -160,7 +163,7 @@ sequenceDiagram
 - **認証**: Laravel標準の `web` ガード(セッション)。登録・ログイン・ログアウト・自分の情報取得の4つのAPIがあります。ログインと登録は、同じIPから1分間に6回までに制限しています。
 - **セッション**: 本番は `sessions` テーブル(PostgreSQL)に保存します。サーバーレス環境ではインスタンス間でファイルを共有できないため、ファイル保存は使っていません。
 - **CSRF**: 更新系のAPIは、`X-CSRF-TOKEN` ヘッダーのトークンが一致するか、ブラウザが付ける `Sec-Fetch-Site: same-origin` ヘッダーで同一オリジンからのリクエストと確認できる場合に受け付けます(Laravel 13 の `PreventRequestForgery`)。
-- **Basic認証**: `EnsureCrmAccess` をすべてのリクエストの手前に置いています。`APP_ACCESS_PASSWORD` を設定したときだけ有効になり、ユーザーのログインとは別の、サイト全体の入口の保護です。
+- **Basic認証**: `EnsureCrmAccess` をすべてのリクエストの手前に置いています。`APP_ACCESS_PASSWORD` を設定したときだけ有効になり、ユーザーのログインとは別の、入口の保護です。有効にしても公開LP(`/` への GET・HEAD)だけは対象外で、アプリ本体(`/app`)とAPIが対象になります。本番では設定しておらず、`/` を公開LP、`/app` とAPIをログイン(セッション認証)で保護する構成で公開しています。
 
 ## 7. データの分離と認可
 

@@ -69,7 +69,7 @@ GitHubへのpushからVercelのデプロイがどう起動されるか(自動デ
 | `DB_CONNECTION` | `pgsql` |
 | `DATABASE_URL`(または `DB_URL`) | Neonの接続文字列。`config/database.php` の `pgsql` は `DB_URL` が無ければ `DATABASE_URL` を使う |
 | `SESSION_SECURE_COOKIE` | HTTPSで配信するため、セッションCookieにSecure属性を付ける |
-| `APP_ACCESS_USER` / `APP_ACCESS_PASSWORD` | サイト全体のBasic認証。パスワードが空なら無効 |
+| `APP_ACCESS_USER` / `APP_ACCESS_PASSWORD` | アプリ本体とAPIのBasic認証(公開LPは対象外)。パスワードが空なら無効。本番では設定しない |
 
 実際にVercelでどの値が設定されているかは、リポジトリからは確認できません。
 
@@ -98,6 +98,8 @@ TLS(HTTPS)はプラットフォーム側で終端されるため、`bootstrap/ap
 ### Basic認証による入口の保護
 
 `EnsureCrmAccess` をすべてのリクエストの手前に置き、URLを知っているだけの第三者が到達しないようにする仕組みです。
+ただし、ログイン前の閲覧者に向けた公開LP(`/` への GET・HEAD)だけは対象外にしています。有効にした場合は、アプリ本体(`/app`)とAPIが対象になります。
+本番ではこの仕組みを使っていません。`/` を公開LP、`/app` をログイン画面とアプリ本体とし、アプリ本体とAPIはログイン(セッション認証)で保護する構成を正式な公開方法としています。
 利用者を個別に識別するものではないため、アプリのログイン(ユーザーごとのデータ分離)の代わりにはなりません(`config/access.php` のコメント)。
 
 ## 5. デプロイ前の確認

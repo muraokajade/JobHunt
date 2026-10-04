@@ -7,6 +7,8 @@
 求人ページのURLを貼ると、サーバー側でページを取得して案件名・報酬・締切などを読み取り、登録フォームの下書きを作ります。
 自分自身の転職活動で使いながら、実際に困ったことをもとに改善を続けています。
 
+**公開URL**: [https://www.jobstockr.jp/](https://www.jobstockr.jp/)(JobHuntの紹介ページ)。「JobHuntを使う」からアプリ本体(`/app`)のログイン画面へ進みます。
+
 ## 解決する課題
 
 | 問題 | JobHuntでの扱い |
@@ -45,7 +47,7 @@
 | Frontend | React 19 / TypeScript 7 / Vite 8 / Tailwind CSS 4 |
 | Backend | Laravel 13(PHP 8.4) |
 | Database | 本番: PostgreSQL(Neon) / ローカル・テスト: SQLite |
-| Authentication | Laravelのセッション認証(Cookie + CSRFトークン)。サイト全体のBasic認証の仕組み(設定時のみ有効) |
+| Authentication | Laravelのセッション認証(Cookie + CSRFトークン)。アプリ本体とAPIはログインで保護し、公開LPはログイン不要。入口用のBasic認証の仕組みもある(設定時のみ有効。本番では未使用) |
 | Test | Vitest 4 + Testing Library / PHPUnit 12 |
 | Deployment | Dockerのマルチステージビルド(Node 24 → FrankenPHP / PHP 8.4)を Vercel 上で実行 |
 | CI | GitHub Actions |
@@ -54,12 +56,12 @@
 
 ```mermaid
 flowchart LR
-    Browser["ブラウザ<br>React SPA"] --> App["Laravel 13<br>SPAのHTML + JSON API<br>セッション認証"]
+    Browser["ブラウザ<br>React SPA"] --> App["Laravel 13<br>公開LP(/) + SPAのHTML(/app)<br>+ JSON API・セッション認証"]
     App --> DB[("PostgreSQL<br>Neon")]
     App -->|"SSRF対策付きで取得"| Sites["外部の求人ページ"]
 ```
 
-LaravelがSPAのHTMLとJSON APIを同じオリジンから返す構成で、本番では1つのDockerイメージとして動きます。
+Laravelが公開LP(`/`)、SPAのHTML(`/app`)、JSON APIを同じオリジンから返す構成で、本番では1つのDockerイメージとして動きます。
 詳細: [docs/02-architecture.md](docs/02-architecture.md)
 
 ## 技術的な見どころ
@@ -85,7 +87,7 @@ URL取込では、利用者が入力したURLへサーバーが接続します�
 | 対象 | 内容 |
 |---|---|
 | Frontend | Vitest 289件。画面全体の流れ(登録・ステータス変更・活動メモ・並び順・デモ)、フォーム、一覧、詳細表示、URL取込の画面を、利用者に見える要素で操作して確認する |
-| Backend | PHPUnit 413件。SSRF対策(167件)、求人ページの解析、ユーザー間のデータ分離(他人の案件は404)、APIの入力検証、ゴミ箱、ステータス履歴、認証、migrationを確認する |
+| Backend | PHPUnit 420件。SSRF対策(167件)、求人ページの解析、ユーザー間のデータ分離(他人の案件は404)、APIの入力検証、ゴミ箱、ステータス履歴、認証、migrationを確認する |
 | 型 | `tsc --noEmit` |
 | ビルド | `npm run build`(本番と同じViteのビルド) |
 | CI | mainへのpush / pull requestで、上記をすべて実行する。DBはメモリ上のSQLiteで、GitHub Secretsは使わない |
@@ -146,7 +148,7 @@ npm run build
 php artisan serve
 ```
 
-`http://127.0.0.1:8000/` を開き、画面からユーザー登録して使います。
+`http://127.0.0.1:8000/` が紹介ページ(公開LP)、`http://127.0.0.1:8000/app` がアプリ本体です。アプリ本体の画面からユーザー登録して使います。
 ローカルでは `.env` の `APP_ACCESS_PASSWORD` が空なので、Basic認証は無効です。
 開発中は `npm run build` の代わりに、別のターミナルで `npm run dev`(Viteの開発サーバー)を起動できます。
 

@@ -86,8 +86,8 @@ JobHuntは、転職と副業の求人・案件を1か所に登録し、応募後
 | Frontend | React 19 / TypeScript / Vite / Tailwind CSS 4(UIライブラリは使わず自作) |
 | Backend | Laravel 13(PHP 8.4)。フロントエンドと同じオリジンからJSON APIを提供する |
 | Database | 本番: PostgreSQL(Neon) / ローカル・テスト: SQLite |
-| Authentication | Laravelのセッション認証(Cookie + CSRFトークン)。加えて、サイト全体をBasic認証で保護する仕組み(パスワードを設定すると有効) |
-| Test | Frontend: Vitest + Testing Library(289件) / Backend: PHPUnit(413件) |
+| Authentication | Laravelのセッション認証(Cookie + CSRFトークン)。公開LP(`/`)はログイン不要で、アプリ本体(`/app`)とAPIはログインで保護する。加えて、入口をBasic認証で保護する仕組み(パスワードを設定すると有効。本番では未使用) |
+| Test | Frontend: Vitest + Testing Library(289件) / Backend: PHPUnit(420件) |
 | Deployment | Dockerのマルチステージビルド(Node 24でフロントエンドをビルド → PHP 8.4 / FrankenPHP)を Vercel 上で実行 |
 | CI | GitHub Actions(main への push / pull request で、Frontend のテスト・型チェック・ビルドと Backend のテストを実行) |
 
